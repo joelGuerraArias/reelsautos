@@ -174,7 +174,7 @@ export default function VideoSettings({ onClose }: VideoSettingsProps) {
           <div className="animate-pulse space-y-2">
             <div className="h-20 bg-gray-200 rounded"></div>
           </div>
-        ) : logosQuery.data?.length > 0 ? (
+        ) : logosQuery.data && Array.isArray(logosQuery.data) && logosQuery.data.length > 0 ? (
           <div className="grid grid-cols-3 gap-2 mb-3">
             {(logosQuery.data as Logo[]).map((logo: Logo) => (
               <button

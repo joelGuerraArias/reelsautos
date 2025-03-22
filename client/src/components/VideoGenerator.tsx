@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Photo, Audio } from "@shared/schema";
-import { Film, Wand2 } from "lucide-react";
+import { Film, Wand2, Music } from "lucide-react";
 import { formatDuration } from "@/lib/utils";
 
 interface VideoGeneratorProps {
@@ -78,7 +78,7 @@ export default function VideoGenerator({ projectId, photos, audio, onBack }: Vid
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-gray-50 p-4 rounded-lg">
             <h3 className="font-medium text-gray-800 mb-2 flex items-center">
-              <span className="material-icons text-sm mr-1">photo_library</span>
+              <Film className="w-4 h-4 mr-1" />
               Photos
             </h3>
             <div className="text-gray-700">
@@ -90,7 +90,7 @@ export default function VideoGenerator({ projectId, photos, audio, onBack }: Vid
           
           <div className="bg-gray-50 p-4 rounded-lg">
             <h3 className="font-medium text-gray-800 mb-2 flex items-center">
-              <span className="material-icons text-sm mr-1">graphic_eq</span>
+              <Music className="w-4 h-4 mr-1" />
               Audio
             </h3>
             <div className="text-gray-700">
@@ -102,7 +102,7 @@ export default function VideoGenerator({ projectId, photos, audio, onBack }: Vid
           
           <div className="bg-gray-50 p-4 rounded-lg">
             <h3 className="font-medium text-gray-800 mb-2 flex items-center">
-              <span className="material-icons text-sm mr-1">movie</span>
+              <Film className="w-4 h-4 mr-1" />
               Video Output
             </h3>
             <div className="text-gray-700">

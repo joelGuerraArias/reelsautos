@@ -501,16 +501,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Process each photo individually
         for (let i = 0; i < photos.length; i++) {
-          if (photos[i]) {
-            // Create a static image segment
+          const photo = photos[i];
+          if (photo && photo.filepath) {
+            // Create a static image segment with overlays
             const tempOutput = path.join(tempDir, `temp_${i}.mp4`);
-            const photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photos[i].filepath}" -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
+            const photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2${logoOverlay}${textOverlay}" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
             await exec(photoCommand);
             
             // Add to concat file
-            if (tempOutput) {
-              concatContent += `file '${tempOutput}'\n`;
-            }
+            concatContent += `file '${tempOutput}'\n`;
           }
         }
         
@@ -541,6 +540,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (fs.existsSync(tempOutput)) {
                 fs.unlinkSync(tempOutput);
               }
+            }
+            // Clean up logo temp file if it exists
+            if (fs.existsSync(logoTempPath)) {
+              fs.unlinkSync(logoTempPath);
             }
             // Try to remove temp directory
             if (fs.existsSync(tempDir)) {

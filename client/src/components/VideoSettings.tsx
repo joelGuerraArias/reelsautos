@@ -42,19 +42,21 @@ export default function VideoSettings({ onClose }: VideoSettingsProps) {
   
   // Obtener la configuración actual
   const settingsQuery = useQuery({
-    queryKey: ['/api/app-settings'],
-    onSuccess: (data) => {
-      const settings = data as AppSettings;
-      if (settings) {
-        setSelectedLogoId(settings.selectedLogoId ?? 1);
-        setLogoPosition(settings.logoPosition ?? "top-right");
-        setShowTitle(settings.showTitle ?? true);
-        setTitleFontSize(settings.titleFontSize ?? 32);
-        setTitleColor(settings.titleColor ?? "#ffffff");
-        setTitlePosition(settings.titlePosition ?? "top-center");
-      }
-    }
+    queryKey: ['/api/app-settings']
   });
+  
+  // Efecto para actualizar el estado local cuando se carga la configuración
+  useEffect(() => {
+    if (settingsQuery.data) {
+      const settings = settingsQuery.data as AppSettings;
+      setSelectedLogoId(settings.selectedLogoId ?? 1);
+      setLogoPosition(settings.logoPosition ?? "top-right");
+      setShowTitle(settings.showTitle ?? true);
+      setTitleFontSize(settings.titleFontSize ?? 32);
+      setTitleColor(settings.titleColor ?? "#ffffff");
+      setTitlePosition(settings.titlePosition ?? "top-center");
+    }
+  }, [settingsQuery.data]);
   
   // Actualizar configuración
   const updateSettingsMutation = useMutation({

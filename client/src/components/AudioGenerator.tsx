@@ -54,6 +54,27 @@ export default function AudioGenerator({ projectId, photos, onBack }: AudioGener
       }
     }
   }, [savedVoicesQuery.data, selectedVoice]);
+
+  // Guardar voz como favorita
+  const saveSavedVoiceMutation = useMutation({
+    mutationFn: async (voiceData: { voiceId: string, voiceName: string, displayName: string, position: number, isDefault: boolean }) => {
+      return apiRequest("POST", "/api/saved-voices", voiceData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/saved-voices'] });
+      toast({
+        title: "Voz favorita guardada",
+        description: "Tu voz preferida ha sido guardada para uso futuro"
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "No se pudo guardar la voz favorita",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
   
   // Seguimos incluyendo la consulta legacy para compatibilidad
   const favoriteVoiceQuery = useQuery({
@@ -142,31 +163,31 @@ export default function AudioGenerator({ projectId, photos, onBack }: AudioGener
     generateAudioMutation.mutate();
   };
   
-  // Guardar voz como favorita
-  const saveSavedVoiceMutation = useMutation({
-    mutationFn: async (voiceData: { voiceId: string, voiceName: string, displayName: string, position: number, isDefault: boolean }) => {
-      return apiRequest("POST", "/api/saved-voices", voiceData);
+  // Usar una voz desde la lista de favoritos
+  const handleUseFavoriteVoice = (voiceId: string) => {
+    setSelectedVoice(voiceId);
+  };
+  
+  // Actualizar voz favorita
+  const updateSavedVoiceMutation = useMutation({
+    mutationFn: async ({ id, ...data }: { id: number, voiceId?: string, voiceName?: string, displayName?: string, position?: number, isDefault?: boolean }) => {
+      return apiRequest("PATCH", `/api/saved-voices/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/saved-voices'] });
       toast({
-        title: "Voz favorita guardada",
-        description: "Tu voz preferida ha sido guardada para uso futuro"
+        title: "Voz favorita actualizada",
+        description: "Tu voz preferida ha sido actualizada correctamente"
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "No se pudo guardar la voz favorita",
+        title: "No se pudo actualizar la voz favorita",
         description: error.message,
         variant: "destructive"
       });
     }
   });
-  
-  // Usar una voz desde la lista de favoritos
-  const handleUseFavoriteVoice = (voiceId: string) => {
-    setSelectedVoice(voiceId);
-  };
   
   // Guardar la voz seleccionada como favorita en una posición específica
   const handleSaveFavorite = (position: number) => {
@@ -203,27 +224,6 @@ export default function AudioGenerator({ projectId, photos, onBack }: AudioGener
       }
     }
   };
-  
-  // Actualizar voz favorita
-  const updateSavedVoiceMutation = useMutation({
-    mutationFn: async ({ id, ...data }: { id: number, voiceId?: string, voiceName?: string, displayName?: string, position?: number, isDefault?: boolean }) => {
-      return apiRequest("PATCH", `/api/saved-voices/${id}`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/saved-voices'] });
-      toast({
-        title: "Voz favorita actualizada",
-        description: "Tu voz preferida ha sido actualizada correctamente"
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "No se pudo actualizar la voz favorita",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  });
   
   // Set the first voice as default when the list loads and no saved voices
   useEffect(() => {

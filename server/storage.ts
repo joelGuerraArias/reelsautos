@@ -4,7 +4,9 @@ import {
   Video, InsertVideo, 
   Project, InsertProject,
   User, InsertUser,
-  UserPreferences, InsertUserPreferences
+  UserPreferences, InsertUserPreferences,
+  SavedVoice, InsertSavedVoice,
+  AppSettings, InsertAppSettings
 } from "@shared/schema";
 
 // Modify the interface with any CRUD methods you might need
@@ -34,10 +36,24 @@ export interface IStorage {
   getVideo(id: number): Promise<Video | undefined>;
   getVideoByProjectId(projectId: string): Promise<Video | undefined>;
   
-  // User Preferences methods
+  // Legacy User Preferences methods
   getFavoriteVoice(): Promise<UserPreferences | undefined>;
   saveFavoriteVoice(preferences: InsertUserPreferences): Promise<UserPreferences>;
   updateFavoriteVoice(preferences: InsertUserPreferences): Promise<UserPreferences>;
+  
+  // Saved Voices methods
+  getSavedVoices(): Promise<SavedVoice[]>;
+  getSavedVoice(id: number): Promise<SavedVoice | undefined>;
+  getSavedVoiceByPosition(position: number): Promise<SavedVoice | undefined>;
+  getDefaultSavedVoice(): Promise<SavedVoice | undefined>;
+  saveSavedVoice(voice: InsertSavedVoice): Promise<SavedVoice>;
+  updateSavedVoice(id: number, voice: Partial<InsertSavedVoice>): Promise<SavedVoice>;
+  deleteSavedVoice(id: number): Promise<boolean>;
+  
+  // App Settings methods
+  getAppSettings(): Promise<AppSettings | undefined>;
+  saveAppSettings(settings: InsertAppSettings): Promise<AppSettings>;
+  updateAppSettings(settings: Partial<InsertAppSettings>): Promise<AppSettings>;
 }
 
 export class MemStorage implements IStorage {
@@ -47,12 +63,16 @@ export class MemStorage implements IStorage {
   private audios: Map<number, Audio>;
   private videos: Map<number, Video>;
   private userPreferences: UserPreferences | undefined;
+  private savedVoices: Map<number, SavedVoice>;
+  private appSettings: AppSettings | undefined;
   
   private userId: number;
   private photoId: number;
   private audioId: number;
   private videoId: number;
   private preferenceId: number;
+  private savedVoiceId: number;
+  private appSettingsId: number;
 
   constructor() {
     this.users = new Map();
@@ -60,12 +80,15 @@ export class MemStorage implements IStorage {
     this.photos = new Map();
     this.audios = new Map();
     this.videos = new Map();
+    this.savedVoices = new Map();
     
     this.userId = 1;
     this.photoId = 1;
     this.audioId = 1;
     this.videoId = 1;
     this.preferenceId = 1;
+    this.savedVoiceId = 1;
+    this.appSettingsId = 1;
   }
 
   // User methods
@@ -186,6 +209,115 @@ export class MemStorage implements IStorage {
     
     this.userPreferences = updatedPreferences;
     return updatedPreferences;
+  }
+  
+  // Saved Voices methods
+  async getSavedVoices(): Promise<SavedVoice[]> {
+    return Array.from(this.savedVoices.values());
+  }
+  
+  async getSavedVoice(id: number): Promise<SavedVoice | undefined> {
+    return this.savedVoices.get(id);
+  }
+  
+  async getSavedVoiceByPosition(position: number): Promise<SavedVoice | undefined> {
+    return Array.from(this.savedVoices.values()).find(
+      voice => voice.position === position
+    );
+  }
+  
+  async getDefaultSavedVoice(): Promise<SavedVoice | undefined> {
+    return Array.from(this.savedVoices.values()).find(
+      voice => voice.isDefault === true
+    );
+  }
+  
+  async saveSavedVoice(voice: InsertSavedVoice): Promise<SavedVoice> {
+    const id = this.savedVoiceId++;
+    const newVoice: SavedVoice = { ...voice, id };
+    
+    // Si es marcada como default, actualizar cualquier otra voz default a false
+    if (voice.isDefault) {
+      for (const [voiceId, existingVoice] of this.savedVoices.entries()) {
+        if (existingVoice.isDefault && voiceId !== id) {
+          this.savedVoices.set(voiceId, { ...existingVoice, isDefault: false });
+        }
+      }
+    }
+    
+    // Asegurarse que no haya duplicados en la misma posición
+    if (typeof voice.position === 'number') {
+      for (const [voiceId, existingVoice] of this.savedVoices.entries()) {
+        if (existingVoice.position === voice.position && voiceId !== id) {
+          // Mover la voz existente a otra posición
+          const newPosition = (existingVoice.position + 1) % 3;
+          this.savedVoices.set(voiceId, { ...existingVoice, position: newPosition });
+        }
+      }
+    }
+    
+    this.savedVoices.set(id, newVoice);
+    return newVoice;
+  }
+  
+  async updateSavedVoice(id: number, voice: Partial<InsertSavedVoice>): Promise<SavedVoice> {
+    const existingVoice = this.savedVoices.get(id);
+    if (!existingVoice) {
+      throw new Error(`Voice with id ${id} not found`);
+    }
+    
+    // Si se actualiza a default, actualizar cualquier otra voz default a false
+    if (voice.isDefault) {
+      for (const [voiceId, otherVoice] of this.savedVoices.entries()) {
+        if (otherVoice.isDefault && voiceId !== id) {
+          this.savedVoices.set(voiceId, { ...otherVoice, isDefault: false });
+        }
+      }
+    }
+    
+    // Asegurarse que no haya duplicados en la misma posición
+    if (typeof voice.position === 'number' && voice.position !== existingVoice.position) {
+      for (const [voiceId, otherVoice] of this.savedVoices.entries()) {
+        if (otherVoice.position === voice.position && voiceId !== id) {
+          // Mover la otra voz a la posición de la voz actual
+          this.savedVoices.set(voiceId, { ...otherVoice, position: existingVoice.position });
+        }
+      }
+    }
+    
+    const updatedVoice: SavedVoice = { ...existingVoice, ...voice };
+    this.savedVoices.set(id, updatedVoice);
+    return updatedVoice;
+  }
+  
+  async deleteSavedVoice(id: number): Promise<boolean> {
+    return this.savedVoices.delete(id);
+  }
+  
+  // App Settings methods
+  async getAppSettings(): Promise<AppSettings | undefined> {
+    return this.appSettings;
+  }
+  
+  async saveAppSettings(settings: InsertAppSettings): Promise<AppSettings> {
+    const id = this.appSettingsId++;
+    const newSettings: AppSettings = { ...settings, id };
+    this.appSettings = newSettings;
+    return newSettings;
+  }
+  
+  async updateAppSettings(settings: Partial<InsertAppSettings>): Promise<AppSettings> {
+    if (!this.appSettings) {
+      return this.saveAppSettings(settings as InsertAppSettings);
+    }
+    
+    const updatedSettings: AppSettings = { 
+      ...this.appSettings, 
+      ...settings
+    };
+    
+    this.appSettings = updatedSettings;
+    return updatedSettings;
   }
 }
 

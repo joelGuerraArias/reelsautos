@@ -590,7 +590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Get favorite voice
+  // Get favorite voice (legacy)
   app.get("/api/preferences/favorite-voice", async (req, res) => {
     try {
       const preferences = await storage.getFavoriteVoice();
@@ -608,7 +608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Save favorite voice
+  // Save favorite voice (legacy)
   app.post("/api/preferences/favorite-voice", async (req, res) => {
     try {
       const { favoriteVoiceId, voiceName } = req.body;
@@ -645,6 +645,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to save favorite voice" });
+    }
+  });
+  
+  // Get all saved voices
+  app.get("/api/saved-voices", async (req, res) => {
+    try {
+      const voices = await storage.getSavedVoices();
+      res.json(voices);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get saved voices" });
+    }
+  });
+  
+  // Get saved voice by ID
+  app.get("/api/saved-voices/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const voice = await storage.getSavedVoice(id);
+      
+      if (!voice) {
+        return res.status(404).json({ error: "Saved voice not found" });
+      }
+      
+      res.json(voice);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get saved voice" });
+    }
+  });
+  
+  // Get saved voice by position (0, 1, 2)
+  app.get("/api/saved-voices-by-position/:position", async (req, res) => {
+    try {
+      const position = parseInt(req.params.position);
+      
+      if (isNaN(position) || position < 0 || position > 2) {
+        return res.status(400).json({ error: "Invalid position. Must be 0, 1, or 2" });
+      }
+      
+      const voice = await storage.getSavedVoiceByPosition(position);
+      
+      if (!voice) {
+        return res.status(404).json({ error: "No voice saved at this position" });
+      }
+      
+      res.json(voice);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get saved voice" });
+    }
+  });
+  
+  // Get default saved voice
+  app.get("/api/saved-voices-default", async (req, res) => {
+    try {
+      const voice = await storage.getDefaultSavedVoice();
+      
+      if (!voice) {
+        return res.status(404).json({ error: "No default voice set" });
+      }
+      
+      res.json(voice);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get default voice" });
+    }
+  });
+  
+  // Save a voice
+  app.post("/api/saved-voices", async (req, res) => {
+    try {
+      const { voiceId, voiceName, displayName, position, isDefault } = req.body;
+      
+      if (!voiceId || !voiceName) {
+        return res.status(400).json({ error: "Voice ID and name are required" });
+      }
+      
+      const timestamp = new Date().toISOString();
+      
+      const savedVoice = await storage.saveSavedVoice({
+        voiceId,
+        voiceName,
+        displayName: displayName || voiceName,
+        position: position !== undefined ? position : 0,
+        isDefault: isDefault !== undefined ? isDefault : false,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      });
+      
+      res.status(201).json(savedVoice);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to save voice" });
+    }
+  });
+  
+  // Update a saved voice
+  app.patch("/api/saved-voices/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { displayName, position, isDefault } = req.body;
+      
+      const updatedVoice = await storage.updateSavedVoice(id, {
+        displayName,
+        position,
+        isDefault,
+        updatedAt: new Date().toISOString()
+      });
+      
+      res.json(updatedVoice);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update saved voice" });
+    }
+  });
+  
+  // Delete a saved voice
+  app.delete("/api/saved-voices/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const result = await storage.deleteSavedVoice(id);
+      
+      if (!result) {
+        return res.status(404).json({ error: "Voice not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete saved voice" });
+    }
+  });
+  
+  // Get app settings
+  app.get("/api/app-settings", async (req, res) => {
+    try {
+      const settings = await storage.getAppSettings();
+      
+      if (!settings) {
+        // Si no hay configuración, inicializarla con valores predeterminados
+        const timestamp = new Date().toISOString();
+        const newSettings = await storage.saveAppSettings({
+          selectedLogoId: 1,
+          logoPosition: "top-right",
+          showTitle: true,
+          titleFontSize: 32,
+          titleColor: "#ffffff",
+          titlePosition: "top-center",
+          createdAt: timestamp,
+          updatedAt: timestamp
+        });
+        
+        return res.json(newSettings);
+      }
+      
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get app settings" });
+    }
+  });
+  
+  // Update app settings
+  app.patch("/api/app-settings", async (req, res) => {
+    try {
+      const { 
+        selectedLogoId, 
+        logoPosition, 
+        showTitle, 
+        titleFontSize, 
+        titleColor, 
+        titlePosition 
+      } = req.body;
+      
+      const updatedSettings = await storage.updateAppSettings({
+        selectedLogoId,
+        logoPosition,
+        showTitle,
+        titleFontSize,
+        titleColor,
+        titlePosition,
+        updatedAt: new Date().toISOString()
+      });
+      
+      res.json(updatedSettings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update app settings" });
     }
   });
 

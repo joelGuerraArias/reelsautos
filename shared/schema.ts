@@ -113,6 +113,44 @@ export interface PhotoValidationResponse {
 }
 
 // User Preferences schema
+export const savedVoices = pgTable("saved_voices", {
+  id: serial("id").primaryKey(),
+  voiceId: text("voice_id").notNull(),
+  voiceName: text("voice_name").notNull(),
+  displayName: text("display_name"),
+  position: integer("position").notNull().default(0), // 0, 1, or 2 (para las 3 posiciones)
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const insertSavedVoiceSchema = createInsertSchema(savedVoices).omit({
+  id: true,
+});
+
+export type InsertSavedVoice = z.infer<typeof insertSavedVoiceSchema>;
+export type SavedVoice = typeof savedVoices.$inferSelect;
+
+export const appSettings = pgTable("app_settings", {
+  id: serial("id").primaryKey(),
+  selectedLogoId: integer("selected_logo_id").default(1), // 1, 2, o 3 para los 3 logos disponibles
+  logoPosition: text("logo_position").default("top-right"), // top-right, top-left, bottom-right, bottom-left
+  showTitle: boolean("show_title").default(true),
+  titleFontSize: integer("title_font_size").default(32),
+  titleColor: text("title_color").default("#ffffff"),
+  titlePosition: text("title_position").default("top-center"), // top-center, bottom-center
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const insertAppSettingsSchema = createInsertSchema(appSettings).omit({
+  id: true,
+});
+
+export type InsertAppSettings = z.infer<typeof insertAppSettingsSchema>;
+export type AppSettings = typeof appSettings.$inferSelect;
+
+// Mantenemos la tabla anterior para compatibilidad pero no la usaremos más
 export const userPreferences = pgTable("user_preferences", {
   id: serial("id").primaryKey(),
   favoriteVoiceId: text("favorite_voice_id").notNull(),

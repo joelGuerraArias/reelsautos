@@ -28,11 +28,13 @@ const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 const PHOTO_DIR = path.join(UPLOAD_DIR, "photos");
 const AUDIO_DIR = path.join(UPLOAD_DIR, "audios");
 const VIDEO_DIR = path.join(UPLOAD_DIR, "videos");
+const LOGO_DIR = path.join(UPLOAD_DIR, "logos");
 
 // Create directories if they don't exist
 fs.mkdirSync(PHOTO_DIR, { recursive: true });
 fs.mkdirSync(AUDIO_DIR, { recursive: true });
 fs.mkdirSync(VIDEO_DIR, { recursive: true });
+fs.mkdirSync(LOGO_DIR, { recursive: true });
 
 // Configure multer for file uploads
 const photoStorage = multer.diskStorage({

@@ -655,27 +655,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Prepare text overlay if enabled - asegurar que el título siempre aparezca
+      // Prepare text overlay - FORZAR para que siempre aparezca
       let textOverlay = '';
       if (appSettings) {
-        // Verificar si hay texto configurado
-        const titleText = appSettings.titleText || "";
-        // Incluso si showTitle es false, si hay un texto definido lo mostramos
-        if (titleText.trim().length > 0) {
-          const textColor = appSettings.titleColor || '#ffffff';
-          const fontSize = appSettings.titleFontSize || 36; // Aumentar tamaño por defecto
-          const text = titleText.replace(/'/g, "\\'"); // Escape single quotes
+        // Obtener el texto siempre - para debugging ponemos un texto por defecto si está vacío
+        const titleText = appSettings.titleText && appSettings.titleText.trim().length > 0 
+          ? appSettings.titleText 
+          : "Video creado con generador automático";
           
-          // Forzar posición inferior siempre para asegurar visibilidad
-          // Hacemos la barra negra aún más grande y ajustamos la posición vertical
-          const textX = '(w-text_w)/2';
-          const textY = 'h-th-60'; // Ajustar posición más hacia el centro
-          
-          // Usar un fondo negro semitransparente más grande y más opaco
-          textOverlay = `,drawbox=y=h-120:w=iw:h=120:color=black@0.7:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=${textColor}:fontsize=${fontSize}:x=${textX}:y=${textY}`;
-          
-          console.log(`Aplicando texto: "${text}" con tamaño ${fontSize}px`);
-        }
+        const textColor = appSettings.titleColor || '#ffffff';
+        const fontSize = appSettings.titleFontSize || 36; // Aumentar tamaño por defecto
+        const text = titleText.replace(/'/g, "\\'"); // Escape single quotes
+        
+        // Siempre en la parte inferior y centrado horizontalmente
+        const textX = '(w-text_w)/2';
+        const textY = 'h-th-50'; // Posición más arriba en el área del fondo
+        
+        // Aumentar la altura del fondo negro y la opacidad para asegurar visibilidad
+        textOverlay = `,drawbox=y=h-130:w=iw:h=130:color=black@0.8:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=${textColor}:fontsize=${fontSize}:x=${textX}:y=${textY}`;
+        
+        console.log(`Aplicando texto FORZADO: "${text}" con tamaño ${fontSize}px`);
       }
 
       if (photos.length === 1 && photos[0]) {

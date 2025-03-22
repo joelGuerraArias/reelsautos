@@ -610,22 +610,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (appSettings?.showTitle && appSettings?.titleText) {
         const textColor = appSettings.titleColor || '#ffffff';
         const fontSize = appSettings.titleFontSize || 32;
-        const textPosition = appSettings.titlePosition || 'top-center';
+        // Forzar posición inferior para el texto con fondo semi-transparente
+        const textPosition = 'bottom-center';
         const text = appSettings.titleText.replace(/'/g, "\\'"); // Escape single quotes
         
-        // Determine position coordinates for text
-        let textX = '(w-text_w)/2';
-        let textY = '30';
+        // Texto siempre centrado en la parte inferior con fondo semitransparente
+        const textX = '(w-text_w)/2';
+        const textY = 'h-th-30';
         
-        if (textPosition === 'bottom-center') {
-          textX = '(w-text_w)/2';
-          textY = 'h-th-30';
-        } else if (textPosition === 'center-center') {
-          textX = '(w-text_w)/2';
-          textY = '(h-th)/2';
-        }
-        
-        textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=${textColor}:fontsize=${fontSize}:x=${textX}:y=${textY}`;
+        // Agregar un fondo semitransparente detrás del texto
+        // Primero dibujamos un rectángulo negro semitransparente en la parte inferior
+        // y luego dibujamos el texto encima de él
+        textOverlay = `,drawbox=y=h-70:w=iw:h=70:color=black@0.5:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=${textColor}:fontsize=${fontSize}:x=${textX}:y=${textY}`;
       }
 
       if (photos.length === 1 && photos[0]) {
@@ -634,10 +630,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (hasLogo) {
           // Si hay logo, usamos filtergraph complejo para manejar 2 entradas visuales (foto + logo)
-          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2[base];[base][2:v]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+          // Usamos scale para llenar el cuadro por completo y crop para mantener dimensiones correctas
+          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=fill,crop=1280:720[base];[base][2:v]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
         } else {
           // Sin logo, solo aplicamos texto si es necesario
-          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2${textOverlay}" -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+          // Usamos scale=fill para llenar completamente el marco y crop para mantener proporciones
+          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=fill,crop=1280:720${textOverlay}" -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
         }
         
         await exec(command);
@@ -654,10 +652,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             if (hasLogo) {
               // Si hay logo, usamos filtergraph complejo
-              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2[base];[base][1:v]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
+              // Usamos scale=fill para llenar todo el marco
+              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=fill,crop=1280:720[base];[base][1:v]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
             } else {
               // Sin logo, solo aplicamos texto si es necesario
-              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2${textOverlay}" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
+              // Usamos scale=fill para llenar todo el marco
+              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=fill,crop=1280:720${textOverlay}" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
             }
             
             await exec(photoCommand);

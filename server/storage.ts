@@ -234,11 +234,19 @@ export class MemStorage implements IStorage {
   
   async saveSavedVoice(voice: InsertSavedVoice): Promise<SavedVoice> {
     const id = this.savedVoiceId++;
-    const newVoice: SavedVoice = { ...voice, id };
+    
+    // Asegurarse de que todos los campos requeridos estén presentes
+    const newVoice: SavedVoice = { 
+      ...voice, 
+      id,
+      position: voice.position ?? 0,
+      displayName: voice.displayName ?? null,
+      isDefault: voice.isDefault ?? false
+    };
     
     // Si es marcada como default, actualizar cualquier otra voz default a false
-    if (voice.isDefault) {
-      for (const [voiceId, existingVoice] of this.savedVoices.entries()) {
+    if (newVoice.isDefault) {
+      for (const [voiceId, existingVoice] of Array.from(this.savedVoices.entries())) {
         if (existingVoice.isDefault && voiceId !== id) {
           this.savedVoices.set(voiceId, { ...existingVoice, isDefault: false });
         }
@@ -246,13 +254,11 @@ export class MemStorage implements IStorage {
     }
     
     // Asegurarse que no haya duplicados en la misma posición
-    if (typeof voice.position === 'number') {
-      for (const [voiceId, existingVoice] of this.savedVoices.entries()) {
-        if (existingVoice.position === voice.position && voiceId !== id) {
-          // Mover la voz existente a otra posición
-          const newPosition = (existingVoice.position + 1) % 3;
-          this.savedVoices.set(voiceId, { ...existingVoice, position: newPosition });
-        }
+    for (const [voiceId, existingVoice] of Array.from(this.savedVoices.entries())) {
+      if (existingVoice.position === newVoice.position && voiceId !== id) {
+        // Mover la voz existente a otra posición
+        const newPosition = (existingVoice.position + 1) % 3;
+        this.savedVoices.set(voiceId, { ...existingVoice, position: newPosition });
       }
     }
     
@@ -268,7 +274,7 @@ export class MemStorage implements IStorage {
     
     // Si se actualiza a default, actualizar cualquier otra voz default a false
     if (voice.isDefault) {
-      for (const [voiceId, otherVoice] of this.savedVoices.entries()) {
+      for (const [voiceId, otherVoice] of Array.from(this.savedVoices.entries())) {
         if (otherVoice.isDefault && voiceId !== id) {
           this.savedVoices.set(voiceId, { ...otherVoice, isDefault: false });
         }
@@ -277,7 +283,7 @@ export class MemStorage implements IStorage {
     
     // Asegurarse que no haya duplicados en la misma posición
     if (typeof voice.position === 'number' && voice.position !== existingVoice.position) {
-      for (const [voiceId, otherVoice] of this.savedVoices.entries()) {
+      for (const [voiceId, otherVoice] of Array.from(this.savedVoices.entries())) {
         if (otherVoice.position === voice.position && voiceId !== id) {
           // Mover la otra voz a la posición de la voz actual
           this.savedVoices.set(voiceId, { ...otherVoice, position: existingVoice.position });
@@ -301,19 +307,41 @@ export class MemStorage implements IStorage {
   
   async saveAppSettings(settings: InsertAppSettings): Promise<AppSettings> {
     const id = this.appSettingsId++;
-    const newSettings: AppSettings = { ...settings, id };
+    
+    // Asegurarse que todos los campos requeridos estén presentes con valores por defecto
+    const newSettings: AppSettings = { 
+      ...settings, 
+      id,
+      selectedLogoId: settings.selectedLogoId ?? 1,
+      logoPosition: settings.logoPosition ?? "top-right",
+      showTitle: settings.showTitle ?? true,
+      titleFontSize: settings.titleFontSize ?? 32,
+      titleColor: settings.titleColor ?? "#ffffff",
+      titlePosition: settings.titlePosition ?? "top-center"
+    };
+    
     this.appSettings = newSettings;
     return newSettings;
   }
   
   async updateAppSettings(settings: Partial<InsertAppSettings>): Promise<AppSettings> {
     if (!this.appSettings) {
-      return this.saveAppSettings(settings as InsertAppSettings);
+      return this.saveAppSettings({
+        selectedLogoId: settings.selectedLogoId ?? 1,
+        logoPosition: settings.logoPosition ?? "top-right", 
+        showTitle: settings.showTitle ?? true,
+        titleFontSize: settings.titleFontSize ?? 32,
+        titleColor: settings.titleColor ?? "#ffffff",
+        titlePosition: settings.titlePosition ?? "top-center",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
     }
     
     const updatedSettings: AppSettings = { 
       ...this.appSettings, 
-      ...settings
+      ...settings,
+      updatedAt: settings.updatedAt ?? new Date().toISOString()
     };
     
     this.appSettings = updatedSettings;

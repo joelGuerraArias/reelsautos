@@ -416,44 +416,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const outputFilename = `video_${nanoid()}.mp4`;
       const outputPath = path.join(VIDEO_DIR, outputFilename);
       
-      // Create a complex filter for zoom effect and transitions
-      let filterComplex = "";
-      let inputs = "";
-      let overlays = "";
+      // Simplified approach for video creation (generate input files list)
+      let inputsList = "";
+      let concatFilter = "";
       
-      // Process each photo with zoom effect (120% to 100%)
+      // Process each photo and create input arguments
       photos.forEach((photo, index) => {
         if (photo) {
-          // Each photo will get its own input and zoom filter
-          inputs += `-loop 1 -t ${photoDuration} -i "${photo.filepath}" `;
-          
-          // Apply zoom effect from 1.2 (120%) to 1.0 (100%) over the duration
-          filterComplex += `[${index}:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,zoompan=z='1.2-(1.2-1.0)*in_transition/duration':d=${photoDuration}:fps=30[v${index}];`;
-          
-          // Concatenate all the filtered video segments
-          if (index === 0) {
-            overlays += `[v${index}]`;
-          } else {
-            overlays += `[v${index - 1}][v${index}]concat=n=2:v=1:a=0[v${index}];`;
-          }
+          inputsList += `-loop 1 -t ${photoDuration} -i "${photo.filepath}" `;
         }
       });
       
-      // Complete the filter by setting the last video segment as output
-      if (photos.length > 0) {
-        filterComplex += `${overlays}[v${photos.length - 1}]`;
-      }
-      
       // Set the final output
-      if (photos.length === 1 && photos[0] && photos[0].filepath) {
-        // For single photo, simplify the filter
+      if (photos.length === 1 && photos[0]) {
+        // For single photo, use simpler approach
         const filepath = photos[0].filepath;
-        const command = `ffmpeg -loop 1 -t ${photoDuration} -i "${filepath}" -i "${audio.filepath}" -filter_complex "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,zoompan=z='1.2-(1.2-1.0)*in_transition/duration':d=${photoDuration}:fps=30[v]" -map "[v]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -shortest -pix_fmt yuv420p "${outputPath}"`;
+        // Simple scale and zoom instead of complex filter
+        const command = `ffmpeg -loop 1 -t ${audioDuration} -i "${filepath}" -i "${audio.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,zoompan=z='if(lte(zoom,1.0),1.2,zoom-0.001)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${audioDuration}:fps=30" -c:v libx264 -c:a aac -b:a 192k -shortest "${outputPath}"`;
         await exec(command);
       } else if (photos.length > 1) {
-        // For multiple photos
-        const command = `ffmpeg ${inputs} -i "${audio.filepath}" -filter_complex "${filterComplex}" -map "[v${photos.length - 1}]" -map ${photos.length}:a -c:v libx264 -c:a aac -b:a 192k -shortest -pix_fmt yuv420p "${outputPath}"`;
-        await exec(command);
+        // For multiple photos, create temporary directory for intermediate files
+        const tempDir = path.join(process.cwd(), 'temp_video');
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir);
+        }
+        
+        // Process each photo individually first
+        for (let i = 0; i < photos.length; i++) {
+          if (photos[i]) {
+            const tempOutput = path.join(tempDir, `temp_${i}.mp4`);
+            const zoomCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photos[i].filepath}" -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,zoompan=z='if(lte(zoom,1.0),1.2,zoom-0.001)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${photoDuration}:fps=30" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
+            await exec(zoomCommand);
+            
+            // Add to concat list
+            concatFilter += `file '${tempOutput}'\n`;
+          }
+        }
+        
+        // Create concat list file
+        const concatFilePath = path.join(tempDir, 'concat_list.txt');
+        fs.writeFileSync(concatFilePath, concatFilter);
+        
+        // Concatenate videos and add audio
+        const concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -i "${audio.filepath}" -c:v copy -c:a aac -b:a 192k -shortest "${outputPath}"`;
+        await exec(concatCommand);
+        
+        // Clean up temp files
+        setTimeout(() => {
+          try {
+            fs.unlinkSync(concatFilePath);
+            for (let i = 0; i < photos.length; i++) {
+              const tempOutput = path.join(tempDir, `temp_${i}.mp4`);
+              if (fs.existsSync(tempOutput)) {
+                fs.unlinkSync(tempOutput);
+              }
+            }
+            // Try to remove temp directory
+            if (fs.existsSync(tempDir)) {
+              fs.rmdirSync(tempDir);
+            }
+          } catch (e) {
+            console.warn("Error cleaning up temp files:", e);
+          }
+        }, 5000);
       } else {
         throw new Error("No valid photos provided");
       }

@@ -23,6 +23,7 @@ import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 
 const exec = promisify(child_process.exec);
+const execSync = child_process.execSync;
 
 // Set up directories for file storage
 const UPLOAD_DIR = path.join(process.cwd(), "uploads");
@@ -598,6 +599,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Crear una copia temporal del logo para procesamiento
             logoTempPath = path.join(tempDir, `logo_${nanoid()}.png`);
             fs.copyFileSync(selectedLogo.filepath, logoTempPath);
+            
+            // No necesitamos redimensionar el logo físicamente como archivo
+            // Lo haremos en el comando FFmpeg al aplicarlo usando el parámetro de escala
             hasLogo = true;
             console.log(`Logo encontrado y aplicado: ${selectedLogo.name}`);
           } else {
@@ -651,22 +655,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Prepare text overlay if enabled
+      // Prepare text overlay if enabled - asegurar que el título siempre aparezca
       let textOverlay = '';
-      if (appSettings?.showTitle && appSettings?.titleText) {
-        const textColor = appSettings.titleColor || '#ffffff';
-        const fontSize = appSettings.titleFontSize || 32;
-        // Forzar posición inferior para el texto con fondo semi-transparente
-        const textPosition = 'bottom-center';
-        const text = appSettings.titleText.replace(/'/g, "\\'"); // Escape single quotes
-        
-        // Asegurar que el texto no se corte: más espacio para el texto completo
-        // El rectángulo negro es más alto (100px en lugar de 70px) y el texto está más arriba
-        const textX = '(w-text_w)/2';
-        const textY = 'h-th-50'; // Posicionado más arriba para asegurar que sea visible
-        
-        // Usar un fondo negro semitransparente más grande para asegurar que el texto quepa
-        textOverlay = `,drawbox=y=h-100:w=iw:h=100:color=black@0.5:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=${textColor}:fontsize=${fontSize}:x=${textX}:y=${textY}`;
+      if (appSettings) {
+        // Verificar si hay texto configurado
+        const titleText = appSettings.titleText || "";
+        // Incluso si showTitle es false, si hay un texto definido lo mostramos
+        if (titleText.trim().length > 0) {
+          const textColor = appSettings.titleColor || '#ffffff';
+          const fontSize = appSettings.titleFontSize || 36; // Aumentar tamaño por defecto
+          const text = titleText.replace(/'/g, "\\'"); // Escape single quotes
+          
+          // Forzar posición inferior siempre para asegurar visibilidad
+          // Hacemos la barra negra aún más grande y ajustamos la posición vertical
+          const textX = '(w-text_w)/2';
+          const textY = 'h-th-60'; // Ajustar posición más hacia el centro
+          
+          // Usar un fondo negro semitransparente más grande y más opaco
+          textOverlay = `,drawbox=y=h-120:w=iw:h=120:color=black@0.7:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=${textColor}:fontsize=${fontSize}:x=${textX}:y=${textY}`;
+          
+          console.log(`Aplicando texto: "${text}" con tamaño ${fontSize}px`);
+        }
       }
 
       if (photos.length === 1 && photos[0]) {
@@ -675,8 +684,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (hasLogo) {
           // Si hay logo, usamos filtergraph complejo para manejar 2 entradas visuales (foto + logo)
-          // Usamos scale para llenar todo el marco sin bordes negros
-          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[base][2:v]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+          // Usamos scale para llenar todo el marco sin bordes negros y reducimos el tamaño del logo en un 25%
+          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[2:v]scale=iw*0.75:ih*0.75[logo];[base][logo]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
         } else {
           // Sin logo, solo aplicamos texto si es necesario
           // Usamos scale=increase para llenar completamente el marco y crop para mantener proporciones
@@ -697,8 +706,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             if (hasLogo) {
               // Si hay logo, usamos filtergraph complejo
-              // Usamos scale=increase para llenar todo el marco
-              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[base][1:v]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
+              // Usamos scale=increase para llenar todo el marco y reducimos el logo en un 25%
+              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=iw*0.75:ih*0.75[logo];[base][logo]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
             } else {
               // Sin logo, solo aplicamos texto si es necesario
               // Usamos scale=increase para llenar todo el marco

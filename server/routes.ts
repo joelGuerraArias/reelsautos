@@ -412,32 +412,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const audioDuration = audio.duration || 0;
       const photoDuration = audioDuration / photos.length;
       
-      // Create a temporary file with the FFmpeg input commands
-      const inputFile = path.join(UPLOAD_DIR, `input_${nanoid()}.txt`);
-      let inputContent = "";
-      
-      // Add each photo with its duration
-      photos.forEach((photo) => {
-        if (photo) {
-          inputContent += `file '${photo.filepath}'\n`;
-          inputContent += `duration ${photoDuration}\n`;
-        }
-      });
-      
-      // Write the input file
-      fs.writeFileSync(inputFile, inputContent);
-      
       // Generate the output video filename
       const outputFilename = `video_${nanoid()}.mp4`;
       const outputPath = path.join(VIDEO_DIR, outputFilename);
       
-      // Use FFmpeg to create the video
-      await exec(
-        `ffmpeg -f concat -safe 0 -i "${inputFile}" -i "${audio.filepath}" -c:v libx264 -c:a aac -b:a 192k -shortest -pix_fmt yuv420p "${outputPath}"`
-      );
+      // Create a complex filter for zoom effect and transitions
+      let filterComplex = "";
+      let inputs = "";
+      let overlays = "";
       
-      // Clean up the input file
-      fs.unlinkSync(inputFile);
+      // Process each photo with zoom effect (120% to 100%)
+      photos.forEach((photo, index) => {
+        if (photo) {
+          // Each photo will get its own input and zoom filter
+          inputs += `-loop 1 -t ${photoDuration} -i "${photo.filepath}" `;
+          
+          // Apply zoom effect from 1.2 (120%) to 1.0 (100%) over the duration
+          filterComplex += `[${index}:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,zoompan=z='1.2-(1.2-1.0)*in_transition/duration':d=${photoDuration}:fps=30[v${index}];`;
+          
+          // Concatenate all the filtered video segments
+          if (index === 0) {
+            overlays += `[v${index}]`;
+          } else {
+            overlays += `[v${index - 1}][v${index}]concat=n=2:v=1:a=0[v${index}];`;
+          }
+        }
+      });
+      
+      // Complete the filter by setting the last video segment as output
+      if (photos.length > 0) {
+        filterComplex += `${overlays}[v${photos.length - 1}]`;
+      }
+      
+      // Set the final output
+      if (photos.length === 1) {
+        // For single photo, simplify the filter
+        const command = `ffmpeg -loop 1 -t ${photoDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -filter_complex "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,zoompan=z='1.2-(1.2-1.0)*in_transition/duration':d=${photoDuration}:fps=30[v]" -map "[v]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -shortest -pix_fmt yuv420p "${outputPath}"`;
+        await exec(command);
+      } else {
+        // For multiple photos
+        const command = `ffmpeg ${inputs} -i "${audio.filepath}" -filter_complex "${filterComplex}" -map "[v${photos.length - 1}]" -map ${photos.length}:a -c:v libx264 -c:a aac -b:a 192k -shortest -pix_fmt yuv420p "${outputPath}"`;
+        await exec(command);
+      }
       
       // Save the video record
       const videoData = {

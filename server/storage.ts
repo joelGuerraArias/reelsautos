@@ -3,7 +3,8 @@ import {
   Audio, InsertAudio, 
   Video, InsertVideo, 
   Project, InsertProject,
-  User, InsertUser
+  User, InsertUser,
+  UserPreferences, InsertUserPreferences
 } from "@shared/schema";
 
 // Modify the interface with any CRUD methods you might need

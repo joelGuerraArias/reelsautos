@@ -111,3 +111,19 @@ export interface PhotoValidationResponse {
   isValid: boolean;
   error?: string;
 }
+
+// User Preferences schema
+export const userPreferences = pgTable("user_preferences", {
+  id: serial("id").primaryKey(),
+  favoriteVoiceId: text("favorite_voice_id").notNull(),
+  voiceName: text("voice_name").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const insertUserPreferencesSchema = createInsertSchema(userPreferences).omit({
+  id: true,
+});
+
+export type InsertUserPreferences = z.infer<typeof insertUserPreferencesSchema>;
+export type UserPreferences = typeof userPreferences.$inferSelect;

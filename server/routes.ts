@@ -416,55 +416,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const outputFilename = `video_${nanoid()}.mp4`;
       const outputPath = path.join(VIDEO_DIR, outputFilename);
       
-      // Simplified approach for video creation (generate input files list)
-      let inputsList = "";
-      let concatFilter = "";
+      // Simplified approach without zoom effect
+      // For multiple photos, create temporary directory for intermediate files
+      const tempDir = path.join(process.cwd(), 'temp_video');
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir);
+      }
       
-      // Process each photo and create input arguments
-      photos.forEach((photo, index) => {
-        if (photo) {
-          inputsList += `-loop 1 -t ${photoDuration} -i "${photo.filepath}" `;
-        }
-      });
+      // Create a text file for concatenation
+      let concatContent = "";
       
-      // Set the final output
       if (photos.length === 1 && photos[0]) {
-        // For single photo, use simpler approach
-        const filepath = photos[0].filepath;
-        // Simple scale and zoom instead of complex filter
-        const command = `ffmpeg -loop 1 -t ${audioDuration} -i "${filepath}" -i "${audio.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,zoompan=z='if(lte(zoom,1.0),1.2,zoom-0.001)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${audioDuration}:fps=30" -c:v libx264 -c:a aac -b:a 192k -shortest "${outputPath}"`;
+        // For single photo, simple static image with audio
+        const command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2" -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
         await exec(command);
       } else if (photos.length > 1) {
-        // For multiple photos, create temporary directory for intermediate files
-        const tempDir = path.join(process.cwd(), 'temp_video');
-        if (!fs.existsSync(tempDir)) {
-          fs.mkdirSync(tempDir);
-        }
+        // For multiple photos, create a slideshow with equal duration for each photo
         
-        // Process each photo individually first
+        // Process each photo individually
         for (let i = 0; i < photos.length; i++) {
           if (photos[i]) {
+            // Create a static image segment
             const tempOutput = path.join(tempDir, `temp_${i}.mp4`);
-            const zoomCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photos[i].filepath}" -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,zoompan=z='if(lte(zoom,1.0),1.2,zoom-0.001)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${photoDuration}:fps=30" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
-            await exec(zoomCommand);
+            const photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photos[i].filepath}" -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
+            await exec(photoCommand);
             
-            // Add to concat list
-            concatFilter += `file '${tempOutput}'\n`;
+            // Add to concat file
+            if (tempOutput) {
+              concatContent += `file '${tempOutput}'\n`;
+            }
           }
         }
         
         // Create concat list file
         const concatFilePath = path.join(tempDir, 'concat_list.txt');
-        fs.writeFileSync(concatFilePath, concatFilter);
+        fs.writeFileSync(concatFilePath, concatContent);
         
-        // Concatenate videos and add audio
-        const concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -i "${audio.filepath}" -c:v copy -c:a aac -b:a 192k -shortest "${outputPath}"`;
+        // Create output file without audio
+        const tempVideoOutput = path.join(tempDir, 'temp_video_output.mp4');
+        const concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c:v libx264 -pix_fmt yuv420p "${tempVideoOutput}"`;
         await exec(concatCommand);
+        
+        // Add audio to the final video
+        const finalCommand = `ffmpeg -i "${tempVideoOutput}" -i "${audio.filepath}" -c:v copy -c:a aac -b:a 192k -shortest "${outputPath}"`;
+        await exec(finalCommand);
         
         // Clean up temp files
         setTimeout(() => {
           try {
-            fs.unlinkSync(concatFilePath);
+            if (fs.existsSync(concatFilePath)) {
+              fs.unlinkSync(concatFilePath);
+            }
+            if (fs.existsSync(tempVideoOutput)) {
+              fs.unlinkSync(tempVideoOutput);
+            }
             for (let i = 0; i < photos.length; i++) {
               const tempOutput = path.join(tempDir, `temp_${i}.mp4`);
               if (fs.existsSync(tempOutput)) {

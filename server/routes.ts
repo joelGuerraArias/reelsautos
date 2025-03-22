@@ -614,14 +614,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const textPosition = 'bottom-center';
         const text = appSettings.titleText.replace(/'/g, "\\'"); // Escape single quotes
         
-        // Texto siempre centrado en la parte inferior con fondo semitransparente
+        // Asegurar que el texto no se corte: más espacio para el texto completo
+        // El rectángulo negro es más alto (100px en lugar de 70px) y el texto está más arriba
         const textX = '(w-text_w)/2';
-        const textY = 'h-th-30';
+        const textY = 'h-th-50'; // Posicionado más arriba para asegurar que sea visible
         
-        // Agregar un fondo semitransparente detrás del texto
-        // Primero dibujamos un rectángulo negro semitransparente en la parte inferior
-        // y luego dibujamos el texto encima de él
-        textOverlay = `,drawbox=y=h-70:w=iw:h=70:color=black@0.5:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=${textColor}:fontsize=${fontSize}:x=${textX}:y=${textY}`;
+        // Usar un fondo negro semitransparente más grande para asegurar que el texto quepa
+        textOverlay = `,drawbox=y=h-100:w=iw:h=100:color=black@0.5:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=${textColor}:fontsize=${fontSize}:x=${textX}:y=${textY}`;
       }
 
       if (photos.length === 1 && photos[0]) {

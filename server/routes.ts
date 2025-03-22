@@ -78,6 +78,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
+  
+  // Get available voices from Eleven Labs API
+  app.get("/api/voices", async (req, res) => {
+    try {
+      const apiKey = process.env.ELEVENLABS_API_KEY;
+      
+      if (!apiKey) {
+        return res.status(500).json({ error: "Eleven Labs API key not configured" });
+      }
+      
+      const response = await axios.get("https://api.elevenlabs.io/v1/voices", {
+        headers: {
+          "xi-api-key": apiKey,
+          "Content-Type": "application/json"
+        }
+      });
+      
+      res.json(response.data);
+    } catch (error) {
+      console.error("Error fetching voices:", error);
+      
+      if (axios.isAxiosError(error)) {
+        res.status(error.response?.status || 500).json({ 
+          error: "Failed to fetch voices from Eleven Labs API",
+          details: error.response?.data
+        });
+      } else {
+        res.status(500).json({ error: "Failed to fetch voices" });
+      }
+    }
+  });
 
   // Create a new project
   app.post("/api/projects", async (req, res) => {
@@ -507,38 +538,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.download(video.filepath, video.filename);
     } catch (error) {
       res.status(500).json({ error: "Failed to download video" });
-    }
-  });
-
-  // Get available voices from Eleven Labs API
-  app.get("/api/voices", async (req, res) => {
-    try {
-      const apiKey = process.env.ELEVENLABS_API_KEY;
-      
-      if (!apiKey) {
-        return res.status(500).json({ error: "Eleven Labs API key not configured" });
-      }
-      
-      const response = await axios.get(
-        "https://api.elevenlabs.io/v1/voices",
-        {
-          headers: {
-            "xi-api-key": apiKey,
-            "Content-Type": "application/json"
-          }
-        }
-      );
-      
-      res.json(response.data);
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
-        res.status(error.response?.status || 500).json({ 
-          error: "Failed to get voices from Eleven Labs API",
-          details: error.response?.data
-        });
-      } else {
-        res.status(500).json({ error: "Failed to get voices" });
-      }
     }
   });
 

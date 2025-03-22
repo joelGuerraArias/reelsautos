@@ -20,7 +20,7 @@ export default function VideoPreview({ video, photos, audio, onBack, onNewProjec
 
   return (
     <div className="mb-6">
-      <h3 className="text-lg font-medium mb-3">Generated Video</h3>
+      <h3 className="text-lg font-medium mb-3">Video Generado</h3>
       
       <div className="bg-gray-900 rounded-lg overflow-hidden">
         <div className="aspect-video w-full bg-black flex items-center justify-center">
@@ -31,7 +31,7 @@ export default function VideoPreview({ video, photos, audio, onBack, onNewProjec
             poster={photos.length > 0 ? `/api/photos/${photos[0].id}/stream` : undefined}
           >
             <source src={`/api/videos/${video.id}/stream`} type="video/mp4" />
-            Your browser does not support the video tag.
+            Tu navegador no soporta la etiqueta de video.
           </video>
         </div>
       </div>
@@ -46,29 +46,29 @@ export default function VideoPreview({ video, photos, audio, onBack, onNewProjec
         </div>
         
         <button 
-          className="px-6 py-2 bg-secondary text-white rounded-lg hover:bg-green-600 transition-colors font-medium flex items-center"
+          className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center"
           onClick={downloadVideo}
         >
           <Download className="w-4 h-4 mr-1" />
-          Download Video
+          Descargar Video
         </button>
       </div>
       
       <div className="flex items-center justify-between mt-6">
         <button 
-          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium flex items-center"
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center"
           onClick={onBack}
         >
           <ArrowLeft className="w-4 h-4 mr-1" />
-          Back
+          Atrás
         </button>
         
         <button 
-          className="px-6 py-2 border border-primary text-primary bg-white rounded-lg hover:bg-blue-50 transition-colors font-medium flex items-center"
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center"
           onClick={onNewProject}
         >
           <PlusCircle className="w-4 h-4 mr-1" />
-          Create New Project
+          Crear Nuevo Proyecto
         </button>
       </div>
     </div>

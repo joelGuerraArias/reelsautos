@@ -28,13 +28,13 @@ export default function AudioPreview({ audio, photos, onBack, onContinue }: Audi
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${audio.projectId}/audio`] });
       toast({
-        title: "Audio deleted",
-        description: "You can now generate a new audio"
+        title: "Audio eliminado",
+        description: "Ahora puedes generar un nuevo audio"
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Regeneration failed",
+        title: "La regeneración falló",
         description: error.message,
         variant: "destructive"
       });
@@ -53,7 +53,7 @@ export default function AudioPreview({ audio, photos, onBack, onContinue }: Audi
   };
   
   const regenerateAudio = () => {
-    if (confirm("Are you sure you want to regenerate the audio? This will delete the current audio.")) {
+    if (confirm("¿Estás seguro que deseas regenerar el audio? Esto eliminará el audio actual.")) {
       regenerateAudioMutation.mutate();
     }
   };
@@ -94,13 +94,12 @@ export default function AudioPreview({ audio, photos, onBack, onContinue }: Audi
 
   return (
     <div>
-      <h3 className="text-lg font-medium mb-3">Generated Audio</h3>
+      <h3 className="text-lg font-medium mb-3">Audio Generado</h3>
       
       <div className="bg-gray-100 rounded-lg p-4">
         <div className="mb-3">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center">
-              <span className="material-icons text-gray-700 mr-1">graphic_eq</span>
               <span className="font-medium text-gray-800">{audio.filename}</span>
             </div>
             <span className="text-sm text-gray-500">{formatDuration(audio.duration || 0)}</span>
@@ -116,7 +115,7 @@ export default function AudioPreview({ audio, photos, onBack, onContinue }: Audi
           
           <div className="w-full bg-white h-14 rounded-lg p-2 flex items-center">
             <button 
-              className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center mr-3 hover:bg-blue-600 transition-colors"
+              className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center mr-3 hover:bg-blue-700 transition-colors"
               onClick={togglePlayback}
             >
               {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
@@ -127,7 +126,7 @@ export default function AudioPreview({ audio, photos, onBack, onContinue }: Audi
                 <div className="absolute top-0 left-0 right-0 bottom-0 flex items-center">
                   <div className="h-2 bg-gray-200 w-full rounded-full">
                     <div 
-                      className="h-full bg-primary rounded-full" 
+                      className="h-full bg-blue-600 rounded-full" 
                       style={{ width: `${progress}%` }}
                     ></div>
                   </div>
@@ -139,30 +138,30 @@ export default function AudioPreview({ audio, photos, onBack, onContinue }: Audi
         
         <div className="text-right">
           <button 
-            className="text-primary hover:text-blue-700 text-sm font-medium flex items-center ml-auto"
+            className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center ml-auto"
             onClick={regenerateAudio}
             disabled={regenerateAudioMutation.isPending}
           >
             <RefreshCw className="w-4 h-4 mr-1" />
-            Regenerate Audio
+            Regenerar Audio
           </button>
         </div>
       </div>
       
       <div className="mt-6 flex justify-between">
         <button 
-          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium flex items-center"
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center"
           onClick={onBack}
         >
           <span className="mr-1">←</span>
-          Back
+          Atrás
         </button>
         
         <button 
-          className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 transition-colors font-medium flex items-center"
+          className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center"
           onClick={onContinue}
         >
-          Continue
+          Continuar
           <span className="ml-1">→</span>
         </button>
       </div>

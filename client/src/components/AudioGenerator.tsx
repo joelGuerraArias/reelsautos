@@ -213,14 +213,14 @@ export default function AudioGenerator({ projectId, photos, onBack }: AudioGener
             disabled={!selectedVoice || saveFavoriteVoiceMutation.isPending}
             onClick={handleSaveFavorite}
             className="flex items-center px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Save as favorite voice"
+            title="Marcar como favorito"
           >
-            <Heart className={`h-4 w-4 mr-1 ${favoriteVoice && favoriteVoice.id === selectedVoice ? 'fill-amber-500' : ''}`} />
-            <span>Save</span>
+            <Star className={`h-4 w-4 mr-1 ${favoriteVoice && favoriteVoice.id === selectedVoice ? 'fill-amber-500' : ''}`} />
+            <span>Favorito</span>
           </button>
         </div>
         {favoriteVoice && favoriteVoice.id !== selectedVoice && (
-          <p className="text-xs text-gray-500 mt-1">You have a favorite voice saved. Select it from the dropdown or set a new favorite.</p>
+          <p className="text-xs text-gray-500 mt-1">Ya tienes una voz favorita guardada. Selecciónala de la lista o marca una nueva.</p>
         )}
       </div>
       

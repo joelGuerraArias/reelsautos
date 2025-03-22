@@ -37,6 +37,7 @@ fs.mkdirSync(VIDEO_DIR, { recursive: true });
 fs.mkdirSync(LOGO_DIR, { recursive: true });
 
 // Configure multer for file uploads
+// Configuración para fotos
 const photoStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, PHOTO_DIR);
@@ -56,6 +57,31 @@ const photoUpload = multer({
       cb(null, true);
     } else {
       cb(new Error("Only image files are allowed"));
+      return;
+    }
+  },
+});
+
+// Configuración para logos
+const logoStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, LOGO_DIR);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + "-" + file.originalname);
+  },
+});
+
+const logoUpload = multer({
+  storage: logoStorage,
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
+  fileFilter: (req, file, cb) => {
+    // Accept only images
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Solo se permiten archivos de imagen"));
       return;
     }
   },
@@ -386,6 +412,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       res.status(500).json({ error: "Failed to stream audio" });
+    }
+  });
+  
+  // API para gestionar logos
+  
+  // Obtener todos los logos
+  app.get("/api/logos", async (req, res) => {
+    try {
+      const logos = await storage.getLogos();
+      res.json(logos);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get logos" });
+    }
+  });
+  
+  // Obtener logo por ID
+  app.get("/api/logos/:id", async (req, res) => {
+    try {
+      const logoId = parseInt(req.params.id);
+      const logo = await storage.getLogo(logoId);
+      
+      if (!logo) {
+        return res.status(404).json({ error: "Logo not found" });
+      }
+      
+      res.json(logo);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get logo" });
+    }
+  });
+  
+  // Subir un nuevo logo
+  app.post("/api/logos", logoUpload.single("logo"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+      
+      const logoData = {
+        name: req.body.name || req.file.originalname,
+        filename: req.file.originalname,
+        filepath: req.file.path,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      const parsedData = insertLogoSchema.parse(logoData);
+      const logo = await storage.createLogo(parsedData);
+      res.status(201).json(logo);
+    } catch (error) {
+      // Limpiar el archivo en caso de error
+      if (req.file) {
+        fs.unlinkSync(req.file.path);
+      }
+      
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        res.status(400).json({ error: validationError.message });
+      } else {
+        res.status(500).json({ error: "Failed to upload logo" });
+      }
+    }
+  });
+  
+  // Eliminar un logo
+  app.delete("/api/logos/:id", async (req, res) => {
+    try {
+      const logoId = parseInt(req.params.id);
+      const logo = await storage.getLogo(logoId);
+      
+      if (!logo) {
+        return res.status(404).json({ error: "Logo not found" });
+      }
+      
+      // Verificar si el logo está en uso en la configuración de la aplicación
+      const appSettings = await storage.getAppSettings();
+      if (appSettings && appSettings.selectedLogoId === logoId) {
+        return res.status(400).json({ 
+          error: "Cannot delete logo that is currently in use. Please select another logo in app settings first." 
+        });
+      }
+      
+      // Eliminar el archivo
+      fs.unlinkSync(logo.filepath);
+      
+      // Eliminar de almacenamiento
+      const deleted = await storage.deleteLogo(logoId);
+      
+      if (deleted) {
+        res.status(204).end();
+      } else {
+        res.status(500).json({ error: "Failed to delete logo" });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete logo" });
     }
   });
 

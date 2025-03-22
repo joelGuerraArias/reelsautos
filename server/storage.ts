@@ -6,6 +6,7 @@ import {
   User, InsertUser,
   UserPreferences, InsertUserPreferences,
   SavedVoice, InsertSavedVoice,
+  Logo, InsertLogo,
   AppSettings, InsertAppSettings
 } from "@shared/schema";
 
@@ -50,6 +51,12 @@ export interface IStorage {
   updateSavedVoice(id: number, voice: Partial<InsertSavedVoice>): Promise<SavedVoice>;
   deleteSavedVoice(id: number): Promise<boolean>;
   
+  // Logo methods
+  getLogos(): Promise<Logo[]>;
+  getLogo(id: number): Promise<Logo | undefined>;
+  createLogo(logo: InsertLogo): Promise<Logo>;
+  deleteLogo(id: number): Promise<boolean>;
+  
   // App Settings methods
   getAppSettings(): Promise<AppSettings | undefined>;
   saveAppSettings(settings: InsertAppSettings): Promise<AppSettings>;
@@ -64,6 +71,7 @@ export class MemStorage implements IStorage {
   private videos: Map<number, Video>;
   private userPreferences: UserPreferences | undefined;
   private savedVoices: Map<number, SavedVoice>;
+  private logos: Map<number, Logo>;
   private appSettings: AppSettings | undefined;
   
   private userId: number;
@@ -72,6 +80,7 @@ export class MemStorage implements IStorage {
   private videoId: number;
   private preferenceId: number;
   private savedVoiceId: number;
+  private logoId: number;
   private appSettingsId: number;
 
   constructor() {
@@ -81,6 +90,7 @@ export class MemStorage implements IStorage {
     this.audios = new Map();
     this.videos = new Map();
     this.savedVoices = new Map();
+    this.logos = new Map();
     
     this.userId = 1;
     this.photoId = 1;
@@ -88,6 +98,7 @@ export class MemStorage implements IStorage {
     this.videoId = 1;
     this.preferenceId = 1;
     this.savedVoiceId = 1;
+    this.logoId = 1;
     this.appSettingsId = 1;
   }
 
@@ -298,6 +309,26 @@ export class MemStorage implements IStorage {
   
   async deleteSavedVoice(id: number): Promise<boolean> {
     return this.savedVoices.delete(id);
+  }
+  
+  // Logo methods
+  async getLogos(): Promise<Logo[]> {
+    return Array.from(this.logos.values());
+  }
+  
+  async getLogo(id: number): Promise<Logo | undefined> {
+    return this.logos.get(id);
+  }
+  
+  async createLogo(logo: InsertLogo): Promise<Logo> {
+    const id = this.logoId++;
+    const newLogo: Logo = { ...logo, id };
+    this.logos.set(id, newLogo);
+    return newLogo;
+  }
+  
+  async deleteLogo(id: number): Promise<boolean> {
+    return this.logos.delete(id);
   }
   
   // App Settings methods

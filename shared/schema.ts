@@ -131,9 +131,25 @@ export const insertSavedVoiceSchema = createInsertSchema(savedVoices).omit({
 export type InsertSavedVoice = z.infer<typeof insertSavedVoiceSchema>;
 export type SavedVoice = typeof savedVoices.$inferSelect;
 
+export const logos = pgTable("logos", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  filename: text("filename").notNull(),
+  filepath: text("filepath").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const insertLogoSchema = createInsertSchema(logos).omit({
+  id: true,
+});
+
+export type InsertLogo = z.infer<typeof insertLogoSchema>;
+export type Logo = typeof logos.$inferSelect;
+
 export const appSettings = pgTable("app_settings", {
   id: serial("id").primaryKey(),
-  selectedLogoId: integer("selected_logo_id").default(1), // 1, 2, o 3 para los 3 logos disponibles
+  selectedLogoId: integer("selected_logo_id"), // Ahora apunta al ID de la tabla logos
   logoPosition: text("logo_position").default("top-right"), // top-right, top-left, bottom-right, bottom-left
   showTitle: boolean("show_title").default(true),
   titleText: text("title_text").default(""), // Texto a mostrar como overlay

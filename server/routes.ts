@@ -669,10 +669,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Siempre en la parte inferior y centrado horizontalmente
         const textX = '(w-text_w)/2';
-        const textY = 'h-th-50'; // Posición más arriba en el área del fondo
+        // El texto debe estar sobre el fondo, no debajo - ajustamos posición vertical
+        const textY = 'h-60'; // Posición más arriba SOBRE el fondo
         
-        // Aumentar la altura del fondo negro y la opacidad para asegurar visibilidad
-        textOverlay = `,drawbox=y=h-130:w=iw:h=130:color=black@0.8:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=${textColor}:fontsize=${fontSize}:x=${textX}:y=${textY}`;
+        // Primero dibujamos el fondo y DESPUÉS dibujamos el texto encima - IMPORTANTE el orden
+        textOverlay = `,drawbox=y=h-100:w=iw:h=100:color=black@0.8:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=${textColor}:fontsize=${fontSize}:x=${textX}:y=${textY}`;
         
         console.log(`Aplicando texto FORZADO: "${text}" con tamaño ${fontSize}px`);
       }

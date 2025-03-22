@@ -13,6 +13,7 @@ import {
   insertAudioSchema,
   insertVideoSchema,
   insertProjectSchema,
+  insertLogoSchema,
   generateAudioSchema,
   generateVideoSchema,
   PhotoValidationResponse
@@ -443,6 +444,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Obtener archivo de logo por ID
+  app.get("/api/logos/:id/file", async (req, res) => {
+    try {
+      const logoId = parseInt(req.params.id);
+      const logo = await storage.getLogo(logoId);
+      
+      if (!logo) {
+        return res.status(404).json({ error: "Logo not found" });
+      }
+      
+      res.sendFile(logo.filepath);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get logo file" });
+    }
+  });
+  
   // Subir un nuevo logo
   app.post("/api/logos", logoUpload.single("logo"), async (req, res) => {
     try {
@@ -552,43 +569,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create a text file for concatenation
       let concatContent = "";
       
-      // Define paths for the selected logo
-      const LOGOS = [
-        { id: 1, src: "https://i.imgur.com/0RUbNyv.png" },
-        { id: 2, src: "https://i.imgur.com/YSdjS5J.png" },
-        { id: 3, src: "https://i.imgur.com/Xy95ldT.png" }
-      ];
-      
-      // Download selected logo to temp directory
-      const selectedLogo = LOGOS.find(l => l.id === (appSettings?.selectedLogoId || 1));
-      const logoTempPath = path.join(tempDir, `logo_${nanoid()}.png`);
-      const logoPosition = appSettings?.logoPosition || "top-right";
+      // Obtener el logo seleccionado de la base de datos
       let logoOverlay = '';
+      let logoTempPath = '';
+      const logoPosition = appSettings?.logoPosition || "top-right";
       
-      if (selectedLogo) {
+      if (appSettings?.selectedLogoId) {
         try {
-          const logoResponse = await axios.get(selectedLogo.src, { responseType: 'arraybuffer' });
-          fs.writeFileSync(logoTempPath, Buffer.from(logoResponse.data, 'binary'));
+          const selectedLogo = await storage.getLogo(appSettings.selectedLogoId);
           
-          // Determine position coordinates for logo
-          let logoX = '10';
-          let logoY = '10';
-          
-          if (logoPosition === 'top-right') {
-            logoX = 'main_w-overlay_w-10';
-            logoY = '10';
-          } else if (logoPosition === 'bottom-left') {
-            logoX = '10';
-            logoY = 'main_h-overlay_h-10';
-          } else if (logoPosition === 'bottom-right') {
-            logoX = 'main_w-overlay_w-10';
-            logoY = 'main_h-overlay_h-10';
+          if (selectedLogo && selectedLogo.filepath) {
+            // Crear una copia temporal del logo para procesamiento
+            logoTempPath = path.join(tempDir, `logo_${nanoid()}.png`);
+            fs.copyFileSync(selectedLogo.filepath, logoTempPath);
+            
+            // Determinar coordenadas de posición para el logo
+            let logoX = '10';
+            let logoY = '10';
+            
+            if (logoPosition === 'top-right') {
+              logoX = 'main_w-overlay_w-10';
+              logoY = '10';
+            } else if (logoPosition === 'bottom-left') {
+              logoX = '10';
+              logoY = 'main_h-overlay_h-10';
+            } else if (logoPosition === 'bottom-right') {
+              logoX = 'main_w-overlay_w-10';
+              logoY = 'main_h-overlay_h-10';
+            }
+            
+            logoOverlay = `,overlay=${logoX}:${logoY}`;
           }
-          
-          logoOverlay = `,overlay=${logoX}:${logoY}`;
         } catch (error) {
-          console.error("Error downloading logo:", error);
-          // Continue without logo if there's an error
+          console.error("Error preparando logo:", error);
+          // Continuar sin logo si hay un error
         }
       }
       

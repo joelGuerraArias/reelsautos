@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { AppSettings } from "@shared/schema";
+import { AppSettings, Logo } from "@shared/schema";
 import { 
   Image, 
   Type, 
@@ -14,15 +14,10 @@ import {
   CornerRightUp,
   CornerLeftUp,
   CornerLeftDown,
-  CornerRightDown
+  CornerRightDown,
+  Upload,
+  Trash2
 } from "lucide-react";
-
-// Logos predefinidos
-const LOGOS = [
-  { id: 1, name: "Logo 1", src: "https://i.imgur.com/0RUbNyv.png" },
-  { id: 2, name: "Logo 2", src: "https://i.imgur.com/YSdjS5J.png" },
-  { id: 3, name: "Logo 3", src: "https://i.imgur.com/Xy95ldT.png" }
-];
 
 interface VideoSettingsProps {
   onClose: () => void;
@@ -40,10 +35,18 @@ export default function VideoSettings({ onClose }: VideoSettingsProps) {
   const [titleColor, setTitleColor] = useState<string>("#ffffff");
   const [titlePosition, setTitlePosition] = useState<string>("top-center");
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [uploadingLogo, setUploadingLogo] = useState<boolean>(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoName, setLogoName] = useState<string>("");
   
   // Obtener la configuración actual
   const settingsQuery = useQuery({
     queryKey: ['/api/app-settings']
+  });
+  
+  // Obtener los logos disponibles
+  const logosQuery = useQuery({
+    queryKey: ['/api/logos']
   });
   
   // Efecto para actualizar el estado local cuando se carga la configuración
@@ -166,26 +169,126 @@ export default function VideoSettings({ onClose }: VideoSettingsProps) {
           <Image className="mr-2" size={18} />
           Logo
         </h3>
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          {LOGOS.map((logo) => (
-            <button
-              key={logo.id}
-              className={`p-2 border rounded-md flex flex-col items-center ${
-                selectedLogoId === logo.id ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
-              }`}
-              onClick={() => setSelectedLogoId(logo.id)}
-            >
-              <img 
-                src={logo.src} 
-                alt={logo.name} 
-                className="h-8 object-contain mb-1"
-              />
-              <div className="text-sm flex items-center">
-                {selectedLogoId === logo.id && <Check size={12} className="text-blue-500 mr-1" />}
-                {logo.name}
+        
+        {logosQuery.isLoading ? (
+          <div className="animate-pulse space-y-2">
+            <div className="h-20 bg-gray-200 rounded"></div>
+          </div>
+        ) : logosQuery.data?.length > 0 ? (
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            {(logosQuery.data as Logo[]).map((logo: Logo) => (
+              <button
+                key={logo.id}
+                className={`p-2 border rounded-md flex flex-col items-center ${
+                  selectedLogoId === logo.id ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                }`}
+                onClick={() => setSelectedLogoId(logo.id)}
+              >
+                <img 
+                  src={`/api/logos/${logo.id}/file`} 
+                  alt={logo.name} 
+                  className="h-8 object-contain mb-1"
+                />
+                <div className="text-sm flex items-center">
+                  {selectedLogoId === logo.id && <Check size={12} className="text-blue-500 mr-1" />}
+                  {logo.name}
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center p-4 border border-dashed border-gray-300 rounded-md mb-3">
+            <p className="text-gray-500 mb-2">No hay logos cargados. Sube un logo para usar en tus videos.</p>
+          </div>
+        )}
+        
+        {/* Formulario de subida de logo */}
+        <div className="mt-4 border-t pt-4">
+          <h4 className="text-md font-medium mb-2">Subir nuevo logo</h4>
+          <div className="flex gap-2">
+            <input
+              type="file"
+              id="logo-upload"
+              className="hidden"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setLogoFile(file);
+                  setLogoName(file.name);
+                }
+              }}
+            />
+            <div className="flex-1">
+              <div className="flex items-center border border-gray-300 rounded-md overflow-hidden">
+                <input
+                  type="text"
+                  value={logoName}
+                  onChange={(e) => setLogoName(e.target.value)}
+                  placeholder="Nombre del logo"
+                  className="flex-1 p-2 focus:outline-none"
+                />
+                <label 
+                  htmlFor="logo-upload"
+                  className="bg-gray-100 p-2 cursor-pointer hover:bg-gray-200"
+                >
+                  <Upload size={16} />
+                </label>
               </div>
+            </div>
+            <button
+              className="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              disabled={!logoFile || uploadingLogo}
+              onClick={() => {
+                if (logoFile) {
+                  setUploadingLogo(true);
+                  
+                  // Crear FormData para la carga
+                  const formData = new FormData();
+                  formData.append('logo', logoFile);
+                  formData.append('name', logoName || logoFile.name);
+                  
+                  // Enviar la solicitud
+                  fetch('/api/logos', {
+                    method: 'POST',
+                    body: formData
+                  })
+                  .then(response => {
+                    if (!response.ok) {
+                      throw new Error('Error al subir el logo');
+                    }
+                    return response.json();
+                  })
+                  .then(data => {
+                    // Actualizar después de cargar
+                    queryClient.invalidateQueries({ queryKey: ['/api/logos'] });
+                    setSelectedLogoId(data.id);
+                    
+                    toast({
+                      title: "Logo cargado",
+                      description: "El logo se ha cargado correctamente"
+                    });
+                    
+                    // Resetear estados
+                    setLogoFile(null);
+                    setLogoName("");
+                  })
+                  .catch(error => {
+                    toast({
+                      title: "Error al cargar",
+                      description: error.message,
+                      variant: "destructive"
+                    });
+                  })
+                  .finally(() => {
+                    setUploadingLogo(false);
+                  });
+                }
+              }}
+            >
+              {uploadingLogo ? 'Subiendo...' : 'Subir Logo'}
             </button>
-          ))}
+          </div>
         </div>
         
         <div className="mt-2">

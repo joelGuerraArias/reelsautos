@@ -136,6 +136,7 @@ export const appSettings = pgTable("app_settings", {
   selectedLogoId: integer("selected_logo_id").default(1), // 1, 2, o 3 para los 3 logos disponibles
   logoPosition: text("logo_position").default("top-right"), // top-right, top-left, bottom-right, bottom-left
   showTitle: boolean("show_title").default(true),
+  titleText: text("title_text").default(""), // Texto a mostrar como overlay
   titleFontSize: integer("title_font_size").default(32),
   titleColor: text("title_color").default("#ffffff"),
   titlePosition: text("title_position").default("top-center"), // top-center, bottom-center

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -16,7 +16,8 @@ import {
   CornerLeftDown,
   CornerRightDown,
   Upload,
-  Trash2
+  Trash2,
+  Save
 } from "lucide-react";
 
 interface VideoSettingsProps {
@@ -25,9 +26,10 @@ interface VideoSettingsProps {
 
 export default function VideoSettings({ onClose }: VideoSettingsProps) {
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Estado local
-  const [selectedLogoId, setSelectedLogoId] = useState<number>(1);
+  const [selectedLogoId, setSelectedLogoId] = useState<number | null>(null);
   const [logoPosition, setLogoPosition] = useState<string>("top-right");
   const [showTitle, setShowTitle] = useState<boolean>(true);
   const [titleText, setTitleText] = useState<string>("");
@@ -46,14 +48,17 @@ export default function VideoSettings({ onClose }: VideoSettingsProps) {
   
   // Obtener los logos disponibles
   const logosQuery = useQuery({
-    queryKey: ['/api/logos']
+    queryKey: ['/api/logos'],
+    // Importante: Si no hay logos disponibles, esta consulta se configurará para reintentarlo automáticamente
+    retry: 3,
+    retryDelay: 1000,
   });
   
   // Efecto para actualizar el estado local cuando se carga la configuración
   useEffect(() => {
     if (settingsQuery.data) {
       const settings = settingsQuery.data as AppSettings;
-      setSelectedLogoId(settings.selectedLogoId ?? 1);
+      setSelectedLogoId(settings.selectedLogoId ?? null);
       setLogoPosition(settings.logoPosition ?? "top-right");
       setShowTitle(settings.showTitle ?? true);
       setTitleText(settings.titleText ?? "");
@@ -62,6 +67,14 @@ export default function VideoSettings({ onClose }: VideoSettingsProps) {
       setTitlePosition(settings.titlePosition ?? "top-center");
     }
   }, [settingsQuery.data]);
+
+  // Elegir el primer logo disponible si no hay uno seleccionado
+  useEffect(() => {
+    if (logosQuery.data && Array.isArray(logosQuery.data) && logosQuery.data.length > 0 && !selectedLogoId) {
+      const firstLogo = logosQuery.data[0] as Logo;
+      setSelectedLogoId(firstLogo.id);
+    }
+  }, [logosQuery.data, selectedLogoId]);
   
   // Actualizar configuración
   const updateSettingsMutation = useMutation({
@@ -417,6 +430,18 @@ export default function VideoSettings({ onClose }: VideoSettingsProps) {
         )}
       </div>
       
+      {/* Información adicional sobre persistencia de logo */}
+      <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-md">
+        <h4 className="text-md font-medium mb-1 text-blue-800 flex items-center">
+          <Save className="mr-2" size={16} />
+          Información Importante
+        </h4>
+        <p className="text-sm text-blue-700">
+          El logo seleccionado quedará guardado y se usará automáticamente en todos los videos futuros.
+          No necesitarás volver a subirlo para cada video.
+        </p>
+      </div>
+
       <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-200">
         <div className="text-sm text-gray-500 flex items-center">
           <AlertCircle size={14} className="mr-1" />

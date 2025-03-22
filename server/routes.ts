@@ -569,7 +569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create a text file for concatenation
       let concatContent = "";
       
-      // Obtener el logo seleccionado de la base de datos
+      // Obtener el logo seleccionado de la base de datos de forma robusta
       let logoTempPath = '';
       let hasLogo = false;
       const logoPosition = appSettings?.logoPosition || "top-right";
@@ -589,18 +589,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
         logoY = 'H-h-10';
       }
       
+      // Intenta obtener el logo seleccionado en la configuración
       if (appSettings?.selectedLogoId) {
         try {
           const selectedLogo = await storage.getLogo(appSettings.selectedLogoId);
           
-          if (selectedLogo && selectedLogo.filepath) {
+          if (selectedLogo && selectedLogo.filepath && fs.existsSync(selectedLogo.filepath)) {
             // Crear una copia temporal del logo para procesamiento
             logoTempPath = path.join(tempDir, `logo_${nanoid()}.png`);
             fs.copyFileSync(selectedLogo.filepath, logoTempPath);
             hasLogo = true;
+            console.log(`Logo encontrado y aplicado: ${selectedLogo.name}`);
+          } else {
+            // Si el logo seleccionado no existe, intentar con el primer logo disponible
+            console.log("Logo seleccionado no encontrado, buscando alternativas...");
+            const logos = await storage.getLogos();
+            if (logos && logos.length > 0) {
+              const firstAvailableLogo = logos[0];
+              if (firstAvailableLogo && firstAvailableLogo.filepath && fs.existsSync(firstAvailableLogo.filepath)) {
+                // Actualizar la configuración con el logo disponible
+                await storage.updateAppSettings({
+                  selectedLogoId: firstAvailableLogo.id,
+                  updatedAt: new Date().toISOString()
+                });
+                
+                // Usar el logo disponible
+                logoTempPath = path.join(tempDir, `logo_${nanoid()}.png`);
+                fs.copyFileSync(firstAvailableLogo.filepath, logoTempPath);
+                hasLogo = true;
+                console.log(`Logo alternativo aplicado: ${firstAvailableLogo.name}`);
+              }
+            }
           }
         } catch (error) {
           console.error("Error preparando logo:", error);
+          // Continuar sin logo si hay un error
+        }
+      } else {
+        // Si no hay logo seleccionado en la configuración, intentar con el primer logo disponible
+        try {
+          const logos = await storage.getLogos();
+          if (logos && logos.length > 0) {
+            const firstLogo = logos[0];
+            if (firstLogo && firstLogo.filepath && fs.existsSync(firstLogo.filepath)) {
+              // Actualizar la configuración con el primer logo
+              await storage.updateAppSettings({
+                selectedLogoId: firstLogo.id,
+                updatedAt: new Date().toISOString()
+              });
+              
+              // Usar el primer logo
+              logoTempPath = path.join(tempDir, `logo_${nanoid()}.png`);
+              fs.copyFileSync(firstLogo.filepath, logoTempPath);
+              hasLogo = true;
+              console.log(`Primer logo disponible aplicado: ${firstLogo.name}`);
+            }
+          }
+        } catch (error) {
+          console.error("Error buscando logos alternativos:", error);
           // Continuar sin logo si hay un error
         }
       }

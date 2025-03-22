@@ -630,12 +630,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (hasLogo) {
           // Si hay logo, usamos filtergraph complejo para manejar 2 entradas visuales (foto + logo)
-          // Usamos scale para llenar el cuadro por completo y crop para mantener dimensiones correctas
-          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=fill,crop=1280:720[base];[base][2:v]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+          // Usamos scale para llenar todo el marco sin bordes negros
+          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[base][2:v]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
         } else {
           // Sin logo, solo aplicamos texto si es necesario
-          // Usamos scale=fill para llenar completamente el marco y crop para mantener proporciones
-          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=fill,crop=1280:720${textOverlay}" -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+          // Usamos scale=increase para llenar completamente el marco y crop para mantener proporciones
+          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720${textOverlay}" -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
         }
         
         await exec(command);
@@ -652,12 +652,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             if (hasLogo) {
               // Si hay logo, usamos filtergraph complejo
-              // Usamos scale=fill para llenar todo el marco
-              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=fill,crop=1280:720[base];[base][1:v]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
+              // Usamos scale=increase para llenar todo el marco
+              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[base][1:v]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
             } else {
               // Sin logo, solo aplicamos texto si es necesario
-              // Usamos scale=fill para llenar todo el marco
-              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=fill,crop=1280:720${textOverlay}" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
+              // Usamos scale=increase para llenar todo el marco
+              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720${textOverlay}" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
             }
             
             await exec(photoCommand);

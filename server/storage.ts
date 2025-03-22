@@ -346,6 +346,7 @@ export class MemStorage implements IStorage {
       selectedLogoId: settings.selectedLogoId ?? 1,
       logoPosition: settings.logoPosition ?? "top-right",
       showTitle: settings.showTitle ?? true,
+      titleText: settings.titleText ?? "",  // Asegurarse de que titleText nunca sea undefined
       titleFontSize: settings.titleFontSize ?? 32,
       titleColor: settings.titleColor ?? "#ffffff",
       titlePosition: settings.titlePosition ?? "top-center"
@@ -361,6 +362,7 @@ export class MemStorage implements IStorage {
         selectedLogoId: settings.selectedLogoId ?? 1,
         logoPosition: settings.logoPosition ?? "top-right", 
         showTitle: settings.showTitle ?? true,
+        titleText: settings.titleText ?? "",  // Asegurarse de que titleText nunca sea undefined
         titleFontSize: settings.titleFontSize ?? 32,
         titleColor: settings.titleColor ?? "#ffffff",
         titlePosition: settings.titlePosition ?? "top-center",

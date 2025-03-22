@@ -97,45 +97,45 @@ export default function PhotoUploader({ projectId }: PhotoUploaderProps) {
             <input {...getInputProps()} />
             <Cloud className="w-10 h-10 mx-auto text-gray-400 mb-2" />
             <p className="mb-2 font-medium">
-              {isDragActive ? "Drop photos here" : "Drag photos here or click to upload"}
+              {isDragActive ? "Suelta las fotos aquí" : "Arrastra fotos aquí o haz clic para subir"}
             </p>
-            <p className="text-sm text-gray-500">Supported formats: JPG, PNG (16:9, 1280x770)</p>
+            <p className="text-sm text-gray-500">Formatos soportados: JPG, PNG (tamaño mínimo: 640x360px)</p>
             
             {isUploading && (
               <div className="mt-3">
                 <div className="w-full bg-gray-200 rounded-full h-2.5">
                   <div className="bg-primary h-2.5 rounded-full animate-pulse w-3/4"></div>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Uploading...</p>
+                <p className="text-xs text-gray-500 mt-1">Subiendo...</p>
               </div>
             )}
           </div>
           
           <div className="text-sm text-gray-500 mt-2 flex items-center">
             <Info className="w-4 h-4 mr-1" />
-            <span>Photos will be displayed for equal time periods in the final video</span>
+            <span>Las fotos se mostrarán por períodos iguales de tiempo en el video final</span>
           </div>
         </div>
         
         {/* Photo Requirements */}
         <div className="bg-blue-50 p-4 rounded-lg w-full md:w-80 flex-shrink-0">
-          <h3 className="font-medium text-blue-800 mb-2">Photo Requirements</h3>
+          <h3 className="font-medium text-blue-800 mb-2">Requisitos de las fotos</h3>
           <ul className="text-sm text-blue-700 space-y-2">
             <li className="flex items-start">
               <CheckCircle className="w-4 h-4 mr-1 mt-0.5" />
-              <span>16:9 aspect ratio (landscape)</span>
+              <span>Cualquier relación de aspecto</span>
             </li>
             <li className="flex items-start">
               <CheckCircle className="w-4 h-4 mr-1 mt-0.5" />
-              <span>1280x720 pixels resolution</span>
+              <span>Mínimo 640x360 píxeles</span>
             </li>
             <li className="flex items-start">
               <CheckCircle className="w-4 h-4 mr-1 mt-0.5" />
-              <span>JPG or PNG format</span>
+              <span>Formato JPG o PNG</span>
             </li>
             <li className="flex items-start">
               <CheckCircle className="w-4 h-4 mr-1 mt-0.5" />
-              <span>Less than 5MB per image</span>
+              <span>Menos de 5MB por imagen</span>
             </li>
           </ul>
         </div>

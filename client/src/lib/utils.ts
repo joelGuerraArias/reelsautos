@@ -31,15 +31,14 @@ export async function validatePhoto(file: File): Promise<PhotoValidationResponse
       const width = img.naturalWidth;
       const height = img.naturalHeight;
       
-      // Check aspect ratio
+      // Accept all aspect ratios
       const aspectRatio = width / height;
-      const targetRatio = 16 / 9;
-      const ratioTolerance = 0.01; // Allow small deviation from exact ratio
       
-      if (Math.abs(aspectRatio - targetRatio) > ratioTolerance) {
+      // Verificar solo el tamaño mínimo para asegurar calidad
+      if (width < 640 || height < 360) {
         resolve({ 
           isValid: false, 
-          error: `Invalid aspect ratio. Expected 16:9 (${targetRatio.toFixed(2)}), got ${aspectRatio.toFixed(2)}`,
+          error: `Imagen demasiado pequeña. Tamaño mínimo: 640x360px, imagen actual: ${width}x${height}px`,
           width,
           height
         });
@@ -49,7 +48,7 @@ export async function validatePhoto(file: File): Promise<PhotoValidationResponse
     };
     
     img.onerror = () => {
-      resolve({ isValid: false, error: "Failed to load image" });
+      resolve({ isValid: false, error: "No se pudo cargar la imagen" });
     };
     
     // Load the image from the file

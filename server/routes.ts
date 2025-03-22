@@ -570,9 +570,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let concatContent = "";
       
       // Obtener el logo seleccionado de la base de datos
-      let logoOverlay = '';
       let logoTempPath = '';
+      let hasLogo = false;
       const logoPosition = appSettings?.logoPosition || "top-right";
+      
+      // Determinar coordenadas de posición para el logo según la posición seleccionada
+      let logoX = '10';
+      let logoY = '10';
+      
+      if (logoPosition === 'top-right') {
+        logoX = 'W-w-10';
+        logoY = '10';
+      } else if (logoPosition === 'bottom-left') {
+        logoX = '10';
+        logoY = 'H-h-10';
+      } else if (logoPosition === 'bottom-right') {
+        logoX = 'W-w-10';
+        logoY = 'H-h-10';
+      }
       
       if (appSettings?.selectedLogoId) {
         try {
@@ -582,23 +597,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Crear una copia temporal del logo para procesamiento
             logoTempPath = path.join(tempDir, `logo_${nanoid()}.png`);
             fs.copyFileSync(selectedLogo.filepath, logoTempPath);
-            
-            // Determinar coordenadas de posición para el logo
-            let logoX = '10';
-            let logoY = '10';
-            
-            if (logoPosition === 'top-right') {
-              logoX = 'main_w-overlay_w-10';
-              logoY = '10';
-            } else if (logoPosition === 'bottom-left') {
-              logoX = '10';
-              logoY = 'main_h-overlay_h-10';
-            } else if (logoPosition === 'bottom-right') {
-              logoX = 'main_w-overlay_w-10';
-              logoY = 'main_h-overlay_h-10';
-            }
-            
-            logoOverlay = `,overlay=${logoX}:${logoY}`;
+            hasLogo = true;
           }
         } catch (error) {
           console.error("Error preparando logo:", error);
@@ -630,22 +629,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (photos.length === 1 && photos[0]) {
-        // For single photo, simple static image with audio with overlays
-        const command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2${logoOverlay}${textOverlay}" -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+        // Para una sola foto, generamos video a partir de imagen estática con audio y overlays
+        let command;
+        
+        if (hasLogo) {
+          // Si hay logo, usamos filtergraph complejo para manejar 2 entradas visuales (foto + logo)
+          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2[base];[base][2:v]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+        } else {
+          // Sin logo, solo aplicamos texto si es necesario
+          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2${textOverlay}" -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+        }
+        
         await exec(command);
       } else if (photos.length > 1) {
-        // For multiple photos, create a slideshow with equal duration for each photo
+        // Para múltiples fotos, crear un slideshow con duración igual para cada foto
         
-        // Process each photo individually
+        // Procesar cada foto individualmente
         for (let i = 0; i < photos.length; i++) {
           const photo = photos[i];
           if (photo && photo.filepath) {
-            // Create a static image segment with overlays
+            // Crear un segmento de imagen estática con overlays
             const tempOutput = path.join(tempDir, `temp_${i}.mp4`);
-            const photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2${logoOverlay}${textOverlay}" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
+            let photoCommand;
+            
+            if (hasLogo) {
+              // Si hay logo, usamos filtergraph complejo
+              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2[base];[base][1:v]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
+            } else {
+              // Sin logo, solo aplicamos texto si es necesario
+              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2${textOverlay}" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
+            }
+            
             await exec(photoCommand);
             
-            // Add to concat file
+            // Añadir al archivo de concatenación
             concatContent += `file '${tempOutput}'\n`;
           }
         }

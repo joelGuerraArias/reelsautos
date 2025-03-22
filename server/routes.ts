@@ -270,7 +270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `https://api.elevenlabs.io/v1/text-to-speech/${voice}`,
         {
           text,
-          model_id: "eleven_monolingual_v1",
+          model_id: "eleven_multilingual_v2",
           voice_settings: {
             stability: 0.5,
             similarity_boost: 0.5
@@ -408,6 +408,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "One or more photos not found" });
       }
       
+      // Get app settings for logo and text overlay
+      const appSettings = await storage.getAppSettings();
+      
       // Calculate duration for each photo
       const audioDuration = audio.duration || 0;
       const photoDuration = audioDuration / photos.length;
@@ -426,9 +429,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create a text file for concatenation
       let concatContent = "";
       
+      // Define paths for the selected logo
+      const LOGOS = [
+        { id: 1, src: "https://i.imgur.com/0RUbNyv.png" },
+        { id: 2, src: "https://i.imgur.com/YSdjS5J.png" },
+        { id: 3, src: "https://i.imgur.com/Xy95ldT.png" }
+      ];
+      
+      // Download selected logo to temp directory
+      const selectedLogo = LOGOS.find(l => l.id === (appSettings?.selectedLogoId || 1));
+      const logoTempPath = path.join(tempDir, `logo_${nanoid()}.png`);
+      const logoPosition = appSettings?.logoPosition || "top-right";
+      let logoOverlay = '';
+      
+      if (selectedLogo) {
+        try {
+          const logoResponse = await axios.get(selectedLogo.src, { responseType: 'arraybuffer' });
+          fs.writeFileSync(logoTempPath, Buffer.from(logoResponse.data, 'binary'));
+          
+          // Determine position coordinates for logo
+          let logoX = '10';
+          let logoY = '10';
+          
+          if (logoPosition === 'top-right') {
+            logoX = 'main_w-overlay_w-10';
+            logoY = '10';
+          } else if (logoPosition === 'bottom-left') {
+            logoX = '10';
+            logoY = 'main_h-overlay_h-10';
+          } else if (logoPosition === 'bottom-right') {
+            logoX = 'main_w-overlay_w-10';
+            logoY = 'main_h-overlay_h-10';
+          }
+          
+          logoOverlay = `,overlay=${logoX}:${logoY}`;
+        } catch (error) {
+          console.error("Error downloading logo:", error);
+          // Continue without logo if there's an error
+        }
+      }
+      
+      // Prepare text overlay if enabled
+      let textOverlay = '';
+      if (appSettings?.showTitle && appSettings?.titleText) {
+        const textColor = appSettings.titleColor || '#ffffff';
+        const fontSize = appSettings.titleFontSize || 32;
+        const textPosition = appSettings.titlePosition || 'top-center';
+        const text = appSettings.titleText.replace(/'/g, "\\'"); // Escape single quotes
+        
+        // Determine position coordinates for text
+        let textX = '(w-text_w)/2';
+        let textY = '30';
+        
+        if (textPosition === 'bottom-center') {
+          textX = '(w-text_w)/2';
+          textY = 'h-th-30';
+        } else if (textPosition === 'center-center') {
+          textX = '(w-text_w)/2';
+          textY = '(h-th)/2';
+        }
+        
+        textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=${textColor}:fontsize=${fontSize}:x=${textX}:y=${textY}`;
+      }
+
       if (photos.length === 1 && photos[0]) {
-        // For single photo, simple static image with audio
-        const command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2" -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+        // For single photo, simple static image with audio with overlays
+        const command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2${logoOverlay}${textOverlay}" -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
         await exec(command);
       } else if (photos.length > 1) {
         // For multiple photos, create a slideshow with equal duration for each photo
@@ -784,6 +850,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           selectedLogoId: 1,
           logoPosition: "top-right",
           showTitle: true,
+          titleText: "",
           titleFontSize: 32,
           titleColor: "#ffffff",
           titlePosition: "top-center",
@@ -806,7 +873,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { 
         selectedLogoId, 
         logoPosition, 
-        showTitle, 
+        showTitle,
+        titleText, 
         titleFontSize, 
         titleColor, 
         titlePosition 
@@ -816,6 +884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         selectedLogoId,
         logoPosition,
         showTitle,
+        titleText,
         titleFontSize,
         titleColor,
         titlePosition,

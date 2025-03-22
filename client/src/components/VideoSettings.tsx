@@ -17,11 +17,11 @@ import {
   CornerRightDown
 } from "lucide-react";
 
-// Logos predefinidos - en un proyecto real, estos serían archivos en el servidor
+// Logos predefinidos
 const LOGOS = [
-  { id: 1, name: "Logo 1", src: "https://via.placeholder.com/100x50?text=Logo+1" },
-  { id: 2, name: "Logo 2", src: "https://via.placeholder.com/100x50?text=Logo+2" },
-  { id: 3, name: "Logo 3", src: "https://via.placeholder.com/100x50?text=Logo+3" }
+  { id: 1, name: "Logo 1", src: "https://i.imgur.com/0RUbNyv.png" },
+  { id: 2, name: "Logo 2", src: "https://i.imgur.com/YSdjS5J.png" },
+  { id: 3, name: "Logo 3", src: "https://i.imgur.com/Xy95ldT.png" }
 ];
 
 interface VideoSettingsProps {
@@ -35,6 +35,7 @@ export default function VideoSettings({ onClose }: VideoSettingsProps) {
   const [selectedLogoId, setSelectedLogoId] = useState<number>(1);
   const [logoPosition, setLogoPosition] = useState<string>("top-right");
   const [showTitle, setShowTitle] = useState<boolean>(true);
+  const [titleText, setTitleText] = useState<string>("");
   const [titleFontSize, setTitleFontSize] = useState<number>(32);
   const [titleColor, setTitleColor] = useState<string>("#ffffff");
   const [titlePosition, setTitlePosition] = useState<string>("top-center");
@@ -52,6 +53,7 @@ export default function VideoSettings({ onClose }: VideoSettingsProps) {
       setSelectedLogoId(settings.selectedLogoId ?? 1);
       setLogoPosition(settings.logoPosition ?? "top-right");
       setShowTitle(settings.showTitle ?? true);
+      setTitleText(settings.titleText ?? "");
       setTitleFontSize(settings.titleFontSize ?? 32);
       setTitleColor(settings.titleColor ?? "#ffffff");
       setTitlePosition(settings.titlePosition ?? "top-center");
@@ -89,6 +91,7 @@ export default function VideoSettings({ onClose }: VideoSettingsProps) {
       selectedLogoId,
       logoPosition,
       showTitle,
+      titleText,
       titleFontSize,
       titleColor,
       titlePosition,
@@ -229,6 +232,18 @@ export default function VideoSettings({ onClose }: VideoSettingsProps) {
         
         {showTitle && (
           <>
+            <div className="mt-3">
+              <p className="text-sm font-medium mb-2">Texto del título:</p>
+              <input
+                type="text"
+                value={titleText}
+                onChange={(e) => setTitleText(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-md text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Escribe el texto que aparecerá sobre la imagen..."
+                maxLength={100}
+              />
+            </div>
+            
             <div className="mt-3">
               <p className="text-sm font-medium mb-2">Posición del Título:</p>
               <div className="grid grid-cols-3 gap-2">

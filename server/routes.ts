@@ -445,14 +445,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Set the final output
-      if (photos.length === 1) {
+      if (photos.length === 1 && photos[0] && photos[0].filepath) {
         // For single photo, simplify the filter
-        const command = `ffmpeg -loop 1 -t ${photoDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -filter_complex "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,zoompan=z='1.2-(1.2-1.0)*in_transition/duration':d=${photoDuration}:fps=30[v]" -map "[v]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -shortest -pix_fmt yuv420p "${outputPath}"`;
+        const filepath = photos[0].filepath;
+        const command = `ffmpeg -loop 1 -t ${photoDuration} -i "${filepath}" -i "${audio.filepath}" -filter_complex "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,zoompan=z='1.2-(1.2-1.0)*in_transition/duration':d=${photoDuration}:fps=30[v]" -map "[v]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -shortest -pix_fmt yuv420p "${outputPath}"`;
         await exec(command);
-      } else {
+      } else if (photos.length > 1) {
         // For multiple photos
         const command = `ffmpeg ${inputs} -i "${audio.filepath}" -filter_complex "${filterComplex}" -map "[v${photos.length - 1}]" -map ${photos.length}:a -c:v libx264 -c:a aac -b:a 192k -shortest -pix_fmt yuv420p "${outputPath}"`;
         await exec(command);
+      } else {
+        throw new Error("No valid photos provided");
       }
       
       // Save the video record
@@ -554,6 +557,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.download(video.filepath, video.filename);
     } catch (error) {
       res.status(500).json({ error: "Failed to download video" });
+    }
+  });
+  
+  // Get favorite voice
+  app.get("/api/preferences/favorite-voice", async (req, res) => {
+    try {
+      const preferences = await storage.getFavoriteVoice();
+      
+      if (!preferences) {
+        return res.status(404).json({ error: "No favorite voice found" });
+      }
+      
+      res.json({
+        favoriteVoiceId: preferences.favoriteVoiceId,
+        voiceName: preferences.voiceName
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get favorite voice" });
+    }
+  });
+  
+  // Save favorite voice
+  app.post("/api/preferences/favorite-voice", async (req, res) => {
+    try {
+      const { favoriteVoiceId, voiceName } = req.body;
+      
+      if (!favoriteVoiceId || !voiceName) {
+        return res.status(400).json({ error: "Voice ID and name are required" });
+      }
+      
+      const timestamp = new Date().toISOString();
+      const preferences = await storage.getFavoriteVoice();
+      
+      let result;
+      if (preferences) {
+        // Update existing preference
+        result = await storage.updateFavoriteVoice({
+          favoriteVoiceId,
+          voiceName,
+          createdAt: preferences.createdAt,
+          updatedAt: timestamp
+        });
+      } else {
+        // Create new preference
+        result = await storage.saveFavoriteVoice({
+          favoriteVoiceId,
+          voiceName,
+          createdAt: timestamp,
+          updatedAt: timestamp
+        });
+      }
+      
+      res.status(201).json({
+        favoriteVoiceId: result.favoriteVoiceId,
+        voiceName: result.voiceName
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to save favorite voice" });
     }
   });
 

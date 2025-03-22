@@ -33,6 +33,11 @@ export interface IStorage {
   createVideo(video: InsertVideo): Promise<Video>;
   getVideo(id: number): Promise<Video | undefined>;
   getVideoByProjectId(projectId: string): Promise<Video | undefined>;
+  
+  // User Preferences methods
+  getFavoriteVoice(): Promise<UserPreferences | undefined>;
+  saveFavoriteVoice(preferences: InsertUserPreferences): Promise<UserPreferences>;
+  updateFavoriteVoice(preferences: InsertUserPreferences): Promise<UserPreferences>;
 }
 
 export class MemStorage implements IStorage {
@@ -41,11 +46,13 @@ export class MemStorage implements IStorage {
   private photos: Map<number, Photo>;
   private audios: Map<number, Audio>;
   private videos: Map<number, Video>;
+  private userPreferences: UserPreferences | undefined;
   
   private userId: number;
   private photoId: number;
   private audioId: number;
   private videoId: number;
+  private preferenceId: number;
 
   constructor() {
     this.users = new Map();
@@ -58,6 +65,7 @@ export class MemStorage implements IStorage {
     this.photoId = 1;
     this.audioId = 1;
     this.videoId = 1;
+    this.preferenceId = 1;
   }
 
   // User methods
@@ -113,7 +121,11 @@ export class MemStorage implements IStorage {
   // Audio methods
   async createAudio(audio: InsertAudio): Promise<Audio> {
     const id = this.audioId++;
-    const newAudio: Audio = { ...audio, id };
+    const newAudio: Audio = { 
+      ...audio, 
+      id,
+      duration: audio.duration || null // Ensure duration is never undefined
+    };
     this.audios.set(id, newAudio);
     return newAudio;
   }
@@ -131,7 +143,11 @@ export class MemStorage implements IStorage {
   // Video methods
   async createVideo(video: InsertVideo): Promise<Video> {
     const id = this.videoId++;
-    const newVideo: Video = { ...video, id };
+    const newVideo: Video = { 
+      ...video, 
+      id,
+      duration: video.duration || null // Ensure duration is never undefined
+    };
     this.videos.set(id, newVideo);
     return newVideo;
   }
@@ -144,6 +160,32 @@ export class MemStorage implements IStorage {
     return Array.from(this.videos.values()).find(
       (video) => video.projectId === projectId
     );
+  }
+  
+  // User Preferences methods
+  async getFavoriteVoice(): Promise<UserPreferences | undefined> {
+    return this.userPreferences;
+  }
+  
+  async saveFavoriteVoice(preferences: InsertUserPreferences): Promise<UserPreferences> {
+    const id = this.preferenceId++;
+    const newPreferences: UserPreferences = { ...preferences, id };
+    this.userPreferences = newPreferences;
+    return newPreferences;
+  }
+  
+  async updateFavoriteVoice(preferences: InsertUserPreferences): Promise<UserPreferences> {
+    if (!this.userPreferences) {
+      return this.saveFavoriteVoice(preferences);
+    }
+    
+    const updatedPreferences: UserPreferences = { 
+      ...preferences, 
+      id: this.userPreferences.id 
+    };
+    
+    this.userPreferences = updatedPreferences;
+    return updatedPreferences;
   }
 }
 

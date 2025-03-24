@@ -658,10 +658,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Prepare text overlay - FORZAR para que siempre aparezca
       let textOverlay = '';
       if (appSettings) {
-        // Obtener el texto siempre - para debugging ponemos un texto por defecto si está vacío
-        const titleText = appSettings.titleText && appSettings.titleText.trim().length > 0 
-          ? appSettings.titleText 
-          : "Video creado con generador automático";
+        // Usar exactamente el texto que el usuario ha configurado
+        const titleText = appSettings.titleText || "";
           
         const textColor = appSettings.titleColor || '#ffffff';
         const fontSize = appSettings.titleFontSize || 36; // Aumentar tamaño por defecto
@@ -685,8 +683,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (hasLogo) {
           // Si hay logo, usamos filtergraph complejo para manejar 2 entradas visuales (foto + logo)
-          // Ajustamos el logo a un máximo de 25px de alto manteniendo la proporción
-          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[2:v]scale=-1:25[logo];[base][logo]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+          // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
+          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[2:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
         } else {
           // Sin logo, solo aplicamos texto si es necesario
           // Usamos scale=increase para llenar completamente el marco y crop para mantener proporciones
@@ -707,8 +705,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             if (hasLogo) {
               // Si hay logo, usamos filtergraph complejo
-              // Ajustamos el logo a un máximo de 25px de alto manteniendo la proporción
-              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:25[logo];[base][logo]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
+              // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
+              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
             } else {
               // Sin logo, solo aplicamos texto si es necesario
               // Usamos scale=increase para llenar todo el marco

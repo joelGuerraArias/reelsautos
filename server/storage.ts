@@ -7,7 +7,9 @@ import {
   UserPreferences, InsertUserPreferences,
   SavedVoice, InsertSavedVoice,
   Logo, InsertLogo,
-  AppSettings, InsertAppSettings
+  AppSettings, InsertAppSettings,
+  BackgroundMusic, InsertBackgroundMusic,
+  UploadedVideo, InsertUploadedVideo
 } from "@shared/schema";
 
 // Modify the interface with any CRUD methods you might need
@@ -61,6 +63,18 @@ export interface IStorage {
   getAppSettings(): Promise<AppSettings | undefined>;
   saveAppSettings(settings: InsertAppSettings): Promise<AppSettings>;
   updateAppSettings(settings: Partial<InsertAppSettings>): Promise<AppSettings>;
+  
+  // Background Music methods
+  getBackgroundMusic(): Promise<BackgroundMusic[]>;
+  getBackgroundMusicById(id: number): Promise<BackgroundMusic | undefined>;
+  createBackgroundMusic(music: InsertBackgroundMusic): Promise<BackgroundMusic>;
+  deleteBackgroundMusic(id: number): Promise<boolean>;
+  
+  // Uploaded Video methods
+  createUploadedVideo(video: InsertUploadedVideo): Promise<UploadedVideo>;
+  getUploadedVideo(id: number): Promise<UploadedVideo | undefined>;
+  getUploadedVideosByProjectId(projectId: string): Promise<UploadedVideo[]>;
+  deleteUploadedVideo(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -73,6 +87,8 @@ export class MemStorage implements IStorage {
   private savedVoices: Map<number, SavedVoice>;
   private logos: Map<number, Logo>;
   private appSettings: AppSettings | undefined;
+  private backgroundMusics: Map<number, BackgroundMusic>;
+  private uploadedVideos: Map<number, UploadedVideo>;
   
   private userId: number;
   private photoId: number;
@@ -82,6 +98,8 @@ export class MemStorage implements IStorage {
   private savedVoiceId: number;
   private logoId: number;
   private appSettingsId: number;
+  private backgroundMusicId: number;
+  private uploadedVideoId: number;
 
   constructor() {
     this.users = new Map();
@@ -91,6 +109,8 @@ export class MemStorage implements IStorage {
     this.videos = new Map();
     this.savedVoices = new Map();
     this.logos = new Map();
+    this.backgroundMusics = new Map();
+    this.uploadedVideos = new Map();
     
     this.userId = 1;
     this.photoId = 1;
@@ -100,6 +120,8 @@ export class MemStorage implements IStorage {
     this.savedVoiceId = 1;
     this.logoId = 1;
     this.appSettingsId = 1;
+    this.backgroundMusicId = 1;
+    this.uploadedVideoId = 1;
   }
 
   // User methods

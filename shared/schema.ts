@@ -61,8 +61,11 @@ export const videos = pgTable("videos", {
   filename: text("filename").notNull(),
   filepath: text("filepath").notNull(),
   duration: integer("duration"),
-  photoIds: text("photo_ids").array().notNull(),
+  photoIds: text("photo_ids").array(),
+  uploadedVideoId: integer("uploaded_video_id"),
   audioId: integer("audio_id").notNull(),
+  backgroundMusicId: integer("background_music_id"),
+  backgroundMusicVolume: text("background_music_volume").default("0.2"),
   projectId: text("project_id").notNull(),
   createdAt: text("created_at").notNull(),
 });
@@ -94,8 +97,11 @@ export const generateAudioSchema = z.object({
 });
 
 export const generateVideoSchema = z.object({
-  photoIds: z.array(z.string().min(1)),
+  photoIds: z.array(z.string().min(1)).optional(),
+  uploadedVideoId: z.number().optional(),
   audioId: z.number(),
+  backgroundMusicId: z.number().optional(),
+  backgroundMusicVolume: z.number().min(0).max(1).default(0.2), // Volumen de la música (0-1)
   projectId: z.string().min(1),
 });
 
@@ -182,3 +188,41 @@ export const insertUserPreferencesSchema = createInsertSchema(userPreferences).o
 
 export type InsertUserPreferences = z.infer<typeof insertUserPreferencesSchema>;
 export type UserPreferences = typeof userPreferences.$inferSelect;
+
+// Música de fondo schema
+export const backgroundMusic = pgTable("background_music", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  filename: text("filename").notNull(),
+  filepath: text("filepath").notNull(),
+  duration: integer("duration"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const insertBackgroundMusicSchema = createInsertSchema(backgroundMusic).omit({
+  id: true,
+});
+
+export type InsertBackgroundMusic = z.infer<typeof insertBackgroundMusicSchema>;
+export type BackgroundMusic = typeof backgroundMusic.$inferSelect;
+
+// Videos subidos schema
+export const uploadedVideos = pgTable("uploaded_videos", {
+  id: serial("id").primaryKey(),
+  filename: text("filename").notNull(),
+  filepath: text("filepath").notNull(),
+  duration: integer("duration"),
+  width: integer("width").notNull(),
+  height: integer("height").notNull(),
+  size: integer("size").notNull(),
+  projectId: text("project_id").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const insertUploadedVideoSchema = createInsertSchema(uploadedVideos).omit({
+  id: true,
+});
+
+export type InsertUploadedVideo = z.infer<typeof insertUploadedVideoSchema>;
+export type UploadedVideo = typeof uploadedVideos.$inferSelect;

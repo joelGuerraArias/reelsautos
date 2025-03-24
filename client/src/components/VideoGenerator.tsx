@@ -587,7 +587,7 @@ export default function VideoGenerator({ projectId, photos, audio, onBack }: Vid
                           </p>
                         </div>
                       </div>
-                      {uploadedVideo?.id === video.id && (
+                      {uploadedVideo && uploadedVideo.id === video.id && (
                         <Check className="text-blue-500" size={18} />
                       )}
                     </button>

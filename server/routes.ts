@@ -667,13 +667,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const fontSize = appSettings.titleFontSize || 36; // Aumentar tamaño por defecto
         const text = titleText.replace(/'/g, "\\'"); // Escape single quotes
         
-        // Siempre en la parte inferior y centrado horizontalmente
-        const textX = '(w-text_w)/2';
-        // El texto debe estar sobre el fondo, no debajo - ajustamos posición vertical
-        const textY = 'h-60'; // Posición más arriba SOBRE el fondo
+        // Título estilo moderno: caja redondeada con texto centrado como en la imagen
+        // Usamos un estilo de texto tipo "pill" o pastilla con fondo rojo y esquinas redondeadas
+        // Colocamos el texto en la parte inferior centrada de la imagen
+        const textX = '(w-text_w)/2-20'; // Centrado con margen para el padding del box
+        const textY = 'h-120'; // Posición en la parte inferior, pero no muy abajo
         
-        // Primero dibujamos el fondo y DESPUÉS dibujamos el texto encima - IMPORTANTE el orden
-        textOverlay = `,drawbox=y=h-100:w=iw:h=100:color=black@0.8:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=${textColor}:fontsize=${fontSize}:x=${textX}:y=${textY}`;
+        // Estilo moderno: texto blanco sobre fondo rojo semi-transparente con esquinas redondeadas
+        textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=red@0.9:boxborderw=20:shadowx=0:shadowy=0`;
         
         console.log(`Aplicando texto FORZADO: "${text}" con tamaño ${fontSize}px`);
       }
@@ -684,8 +685,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (hasLogo) {
           // Si hay logo, usamos filtergraph complejo para manejar 2 entradas visuales (foto + logo)
-          // Usamos scale para llenar todo el marco sin bordes negros y reducimos el tamaño del logo en un 25%
-          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[2:v]scale=iw*0.75:ih*0.75[logo];[base][logo]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+          // Ajustamos el logo a un máximo de 25px de alto manteniendo la proporción
+          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[2:v]scale=-1:25[logo];[base][logo]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
         } else {
           // Sin logo, solo aplicamos texto si es necesario
           // Usamos scale=increase para llenar completamente el marco y crop para mantener proporciones
@@ -706,8 +707,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             if (hasLogo) {
               // Si hay logo, usamos filtergraph complejo
-              // Usamos scale=increase para llenar todo el marco y reducimos el logo en un 25%
-              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=iw*0.75:ih*0.75[logo];[base][logo]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
+              // Ajustamos el logo a un máximo de 25px de alto manteniendo la proporción
+              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:25[logo];[base][logo]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
             } else {
               // Sin logo, solo aplicamos texto si es necesario
               // Usamos scale=increase para llenar todo el marco

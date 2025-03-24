@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Photo, Audio, AppSettings, Logo } from "@shared/schema";
+import { Photo, Audio, AppSettings, Logo, BackgroundMusic, UploadedVideo } from "@shared/schema";
 import { 
   Film, 
   Wand2, 
@@ -17,9 +17,13 @@ import {
   CornerLeftDown,
   CornerRightDown,
   Save,
-  Upload
+  Upload,
+  Video,
+  Volume2,
+  Disc,
+  FileVideo
 } from "lucide-react";
-import { formatDuration } from "@/lib/utils";
+import { formatDuration, formatFileSize } from "@/lib/utils";
 
 interface VideoGeneratorProps {
   projectId: string;
@@ -44,6 +48,24 @@ export default function VideoGenerator({ projectId, photos, audio, onBack }: Vid
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoName, setLogoName] = useState<string>("");
   
+  // Estado para la funcionalidad de video subido
+  const [useUploadedVideo, setUseUploadedVideo] = useState<boolean>(false);
+  const [uploadedVideo, setUploadedVideo] = useState<UploadedVideo | null>(null);
+  const [uploadingVideo, setUploadingVideo] = useState<boolean>(false);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  
+  // Estado para la música de fondo
+  const [useBackgroundMusic, setUseBackgroundMusic] = useState<boolean>(false);
+  const [selectedBackgroundMusicId, setSelectedBackgroundMusicId] = useState<number | null>(null);
+  const [backgroundMusicVolume, setBackgroundMusicVolume] = useState<number>(0.2);
+  const [uploadingMusic, setUploadingMusic] = useState<boolean>(false);
+  const [musicFile, setMusicFile] = useState<File | null>(null);
+  const [musicName, setMusicName] = useState<string>("");
+  
+  // Referencias a los inputs de archivos
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const musicInputRef = useRef<HTMLInputElement>(null);
+  
   // Obtener la configuración actual
   const settingsQuery = useQuery({
     queryKey: ['/api/app-settings']
@@ -54,6 +76,22 @@ export default function VideoGenerator({ projectId, photos, audio, onBack }: Vid
     queryKey: ['/api/logos'],
     retry: 3,
     retryDelay: 1000,
+  });
+  
+  // Obtener los videos subidos por el usuario para este proyecto
+  const uploadedVideosQuery = useQuery({
+    queryKey: [`/api/projects/${projectId}/uploaded-videos`],
+    retry: 3,
+    retryDelay: 1000,
+    enabled: useUploadedVideo, // Solo cargar cuando se active la opción
+  });
+  
+  // Obtener la música de fondo disponible
+  const backgroundMusicQuery = useQuery({
+    queryKey: ['/api/background-music'],
+    retry: 3,
+    retryDelay: 1000,
+    enabled: useBackgroundMusic, // Solo cargar cuando se active la opción
   });
   
   // Efecto para actualizar el estado local cuando se carga la configuración
@@ -113,6 +151,70 @@ export default function VideoGenerator({ projectId, photos, audio, onBack }: Vid
     });
   };
   
+  // Mutación para subir un video
+  const uploadVideoMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("video", file);
+      formData.append("projectId", projectId);
+      
+      return fetch("/api/uploaded-videos", {
+        method: "POST",
+        body: formData
+      }).then(res => {
+        if (!res.ok) throw new Error("Error al subir el video");
+        return res.json();
+      });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/uploaded-videos`] });
+      setUploadedVideo(data);
+      toast({
+        title: "Video subido",
+        description: "El video se ha subido correctamente"
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error al subir el video",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+  
+  // Mutación para subir música de fondo
+  const uploadMusicMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("music", file);
+      formData.append("name", file.name);
+      
+      return fetch("/api/background-music", {
+        method: "POST",
+        body: formData
+      }).then(res => {
+        if (!res.ok) throw new Error("Error al subir la música");
+        return res.json();
+      });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/background-music'] });
+      setSelectedBackgroundMusicId(data.id);
+      toast({
+        title: "Música subida",
+        description: "La música de fondo se ha subido correctamente"
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error al subir la música",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+  
   // Generate video mutation
   const generateVideoMutation = useMutation({
     mutationFn: async () => {
@@ -120,11 +222,27 @@ export default function VideoGenerator({ projectId, photos, audio, onBack }: Vid
       await saveSettings();
       
       setIsGenerating(true);
-      return apiRequest("POST", "/api/videos", {
-        photoIds: photos.map(photo => photo.id.toString()),
+      
+      // Construir el payload según si estamos usando fotos o video subido
+      const payload: any = {
         audioId: audio.id,
         projectId
-      });
+      };
+      
+      // Agregar fotos o video subido
+      if (useUploadedVideo && uploadedVideo) {
+        payload.uploadedVideoId = uploadedVideo.id;
+      } else {
+        payload.photoIds = photos.map(photo => photo.id.toString());
+      }
+      
+      // Agregar música de fondo si está habilitada
+      if (useBackgroundMusic && selectedBackgroundMusicId) {
+        payload.backgroundMusicId = selectedBackgroundMusicId;
+        payload.backgroundMusicVolume = backgroundMusicVolume;
+      }
+      
+      return apiRequest("POST", "/api/videos", payload);
     },
     onSuccess: () => {
       setIsGenerating(false);

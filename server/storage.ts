@@ -202,6 +202,10 @@ export class MemStorage implements IStorage {
     const newVideo: Video = { 
       ...video, 
       id,
+      photoIds: video.photoIds || null,
+      uploadedVideoId: video.uploadedVideoId || null,
+      backgroundMusicId: video.backgroundMusicId || null,
+      backgroundMusicVolume: video.backgroundMusicVolume || "0.2",
       duration: video.duration || null // Ensure duration is never undefined
     };
     this.videos.set(id, newVideo);
@@ -401,6 +405,56 @@ export class MemStorage implements IStorage {
     
     this.appSettings = updatedSettings;
     return updatedSettings;
+  }
+  
+  // Background Music methods
+  async getBackgroundMusic(): Promise<BackgroundMusic[]> {
+    return Array.from(this.backgroundMusics.values());
+  }
+  
+  async getBackgroundMusicById(id: number): Promise<BackgroundMusic | undefined> {
+    return this.backgroundMusics.get(id);
+  }
+  
+  async createBackgroundMusic(music: InsertBackgroundMusic): Promise<BackgroundMusic> {
+    const id = this.backgroundMusicId++;
+    const newMusic: BackgroundMusic = { 
+      ...music, 
+      id,
+      duration: music.duration || null
+    };
+    this.backgroundMusics.set(id, newMusic);
+    return newMusic;
+  }
+  
+  async deleteBackgroundMusic(id: number): Promise<boolean> {
+    return this.backgroundMusics.delete(id);
+  }
+  
+  // Uploaded Video methods
+  async createUploadedVideo(video: InsertUploadedVideo): Promise<UploadedVideo> {
+    const id = this.uploadedVideoId++;
+    const newVideo: UploadedVideo = { 
+      ...video, 
+      id,
+      duration: video.duration || null
+    };
+    this.uploadedVideos.set(id, newVideo);
+    return newVideo;
+  }
+  
+  async getUploadedVideo(id: number): Promise<UploadedVideo | undefined> {
+    return this.uploadedVideos.get(id);
+  }
+  
+  async getUploadedVideosByProjectId(projectId: string): Promise<UploadedVideo[]> {
+    return Array.from(this.uploadedVideos.values()).filter(
+      (video) => video.projectId === projectId
+    );
+  }
+  
+  async deleteUploadedVideo(id: number): Promise<boolean> {
+    return this.uploadedVideos.delete(id);
   }
 }
 

@@ -14,6 +14,8 @@ import {
   insertVideoSchema,
   insertProjectSchema,
   insertLogoSchema,
+  insertBackgroundMusicSchema,
+  insertUploadedVideoSchema,
   generateAudioSchema,
   generateVideoSchema,
   PhotoValidationResponse
@@ -31,12 +33,16 @@ const PHOTO_DIR = path.join(UPLOAD_DIR, "photos");
 const AUDIO_DIR = path.join(UPLOAD_DIR, "audios");
 const VIDEO_DIR = path.join(UPLOAD_DIR, "videos");
 const LOGO_DIR = path.join(UPLOAD_DIR, "logos");
+const UPLOADED_VIDEO_DIR = path.join(UPLOAD_DIR, "uploaded_videos");
+const BACKGROUND_MUSIC_DIR = path.join(UPLOAD_DIR, "background_music");
 
 // Create directories if they don't exist
 fs.mkdirSync(PHOTO_DIR, { recursive: true });
 fs.mkdirSync(AUDIO_DIR, { recursive: true });
 fs.mkdirSync(VIDEO_DIR, { recursive: true });
 fs.mkdirSync(LOGO_DIR, { recursive: true });
+fs.mkdirSync(UPLOADED_VIDEO_DIR, { recursive: true });
+fs.mkdirSync(BACKGROUND_MUSIC_DIR, { recursive: true });
 
 // Configure multer for file uploads
 // Configuración para fotos
@@ -84,6 +90,56 @@ const logoUpload = multer({
       cb(null, true);
     } else {
       cb(new Error("Solo se permiten archivos de imagen"));
+      return;
+    }
+  },
+});
+
+// Configuración para videos subidos
+const uploadedVideoStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, UPLOADED_VIDEO_DIR);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + "-" + file.originalname);
+  },
+});
+
+const videoUpload = multer({
+  storage: uploadedVideoStorage,
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
+  fileFilter: (req, file, cb) => {
+    // Accept only videos
+    if (file.mimetype.startsWith("video/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Solo se permiten archivos de video"));
+      return;
+    }
+  },
+});
+
+// Configuración para música de fondo
+const backgroundMusicStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, BACKGROUND_MUSIC_DIR);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + "-" + file.originalname);
+  },
+});
+
+const musicUpload = multer({
+  storage: backgroundMusicStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    // Accept only audio files
+    if (file.mimetype.startsWith("audio/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Solo se permiten archivos de audio"));
       return;
     }
   },

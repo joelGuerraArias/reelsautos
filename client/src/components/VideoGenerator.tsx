@@ -313,16 +313,43 @@ export default function VideoGenerator({ projectId, photos, audio, onBack }: Vid
       {/* Video Summary */}
       <div className="mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h3 className="font-medium text-gray-800 mb-2 flex items-center">
-              <Film className="w-4 h-4 mr-1" />
-              Fotos
-            </h3>
-            <div className="text-gray-700">
-              <p className="mb-1"><span className="font-medium">{photos.length}</span> fotos subidas</p>
-              <p className="mb-1">Formato: {photos[0]?.width}×{photos[0]?.height}</p>
-              <p>Cada foto: ~{timePerPhoto} segundos</p>
-            </div>
+          {/* Mostrar fotos o video subido según corresponda */}
+          <div className={`bg-gray-50 p-4 rounded-lg ${useUploadedVideo ? 'border border-blue-200' : ''}`}>
+            {useUploadedVideo ? (
+              <>
+                <h3 className="font-medium text-gray-800 mb-2 flex items-center">
+                  <FileVideo className="w-4 h-4 mr-1 text-blue-500" />
+                  Video Subido
+                </h3>
+                <div className="text-gray-700">
+                  {uploadedVideo ? (
+                    <>
+                      <p className="mb-1"><span className="font-medium">{uploadedVideo.filename}</span></p>
+                      <p className="mb-1">Resolución: {uploadedVideo.width}×{uploadedVideo.height}</p>
+                      <p>Duración: {formatDuration(uploadedVideo.duration || 0)}</p>
+                    </>
+                  ) : (
+                    <p className="text-blue-500">Selecciona o sube un video</p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="font-medium text-gray-800 mb-2 flex items-center">
+                  <Film className="w-4 h-4 mr-1" />
+                  Fotos
+                </h3>
+                <div className="text-gray-700">
+                  <p className="mb-1"><span className="font-medium">{photos.length}</span> fotos subidas</p>
+                  {photos.length > 0 && (
+                    <>
+                      <p className="mb-1">Formato: {photos[0]?.width}×{photos[0]?.height}</p>
+                      <p>Cada foto: ~{timePerPhoto} segundos</p>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </div>
           
           <div className="bg-gray-50 p-4 rounded-lg">
@@ -337,7 +364,7 @@ export default function VideoGenerator({ projectId, photos, audio, onBack }: Vid
             </div>
           </div>
           
-          <div className="bg-gray-50 p-4 rounded-lg">
+          <div className={`bg-gray-50 p-4 rounded-lg ${useBackgroundMusic ? 'border border-blue-200' : ''}`}>
             <h3 className="font-medium text-gray-800 mb-2 flex items-center">
               <Film className="w-4 h-4 mr-1" />
               Video de Salida
@@ -345,7 +372,10 @@ export default function VideoGenerator({ projectId, photos, audio, onBack }: Vid
             <div className="text-gray-700">
               <p className="mb-1"><span className="font-medium">MP4</span> formato</p>
               <p className="mb-1">Resolución: 1280×720</p>
-              <p>Duración: ~{formatDuration(audio.duration || 0)}</p>
+              <p className="mb-1">Duración: ~{formatDuration(audio.duration || 0)}</p>
+              {useBackgroundMusic && selectedBackgroundMusicId && (
+                <p className="text-blue-500">Con música de fondo</p>
+              )}
             </div>
           </div>
         </div>
@@ -479,6 +509,305 @@ export default function VideoGenerator({ projectId, photos, audio, onBack }: Vid
               ))}
             </div>
           </div>
+        </div>
+        
+        {/* Opción de subir video */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-semibold flex items-center">
+              <FileVideo className="mr-2" size={18} />
+              Video personalizado
+            </h3>
+            <div className="flex items-center">
+              <input 
+                type="checkbox" 
+                id="use-uploaded-video" 
+                checked={useUploadedVideo} 
+                onChange={(e) => setUseUploadedVideo(e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="use-uploaded-video" className="ml-2 text-sm text-gray-700">
+                Usar video en lugar de fotos
+              </label>
+            </div>
+          </div>
+          
+          {useUploadedVideo && (
+            <div className="mt-3 p-4 bg-gray-50 rounded-md">
+              {uploadedVideo ? (
+                <div className="flex flex-col space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Video className="mr-2 text-blue-500" size={18} />
+                      <span className="font-medium">{uploadedVideo.filename}</span>
+                    </div>
+                    <button
+                      onClick={() => setUploadedVideo(null)}
+                      className="text-red-500 hover:text-red-600"
+                      title="Eliminar video"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    <p>Duración: {formatDuration(uploadedVideo.duration || 0)}</p>
+                    <p>Tamaño: {formatFileSize(uploadedVideo.size)}</p>
+                    <p>Resolución: {uploadedVideo.width}×{uploadedVideo.height}</p>
+                  </div>
+                </div>
+              ) : uploadingVideo ? (
+                <div className="flex flex-col items-center justify-center p-4">
+                  <div className="animate-pulse flex flex-col items-center">
+                    <Video className="text-blue-500 mb-2" size={32} />
+                    <p className="text-sm text-gray-600">Subiendo video...</p>
+                  </div>
+                </div>
+              ) : uploadedVideosQuery.isLoading ? (
+                <div className="animate-pulse space-y-2 p-4">
+                  <div className="h-10 bg-gray-200 rounded mb-2"></div>
+                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                </div>
+              ) : uploadedVideosQuery.data && Array.isArray(uploadedVideosQuery.data) && uploadedVideosQuery.data.length > 0 ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-600 mb-2">Selecciona un video subido previamente:</p>
+                  {(uploadedVideosQuery.data as UploadedVideo[]).map((video: UploadedVideo) => (
+                    <button
+                      key={video.id}
+                      className={`p-2 border rounded-md w-full text-left flex justify-between items-center ${
+                        uploadedVideo && uploadedVideo.id === video.id ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                      }`}
+                      onClick={() => setUploadedVideo(video)}
+                    >
+                      <div className="flex items-center">
+                        <Video className="mr-2 text-blue-500" size={16} />
+                        <div>
+                          <p className="font-medium">{video.filename}</p>
+                          <p className="text-xs text-gray-500">
+                            {formatDuration(video.duration || 0)} • {formatFileSize(video.size)}
+                          </p>
+                        </div>
+                      </div>
+                      {uploadedVideo?.id === video.id && (
+                        <Check className="text-blue-500" size={18} />
+                      )}
+                    </button>
+                  ))}
+                  
+                  <div className="mt-3">
+                    <p className="text-sm text-gray-600 mb-2">O sube un nuevo video:</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="file"
+                        id="video-upload"
+                        className="hidden"
+                        accept="video/mp4,video/quicktime,video/webm"
+                        ref={videoInputRef}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setVideoFile(file);
+                            setUploadingVideo(true);
+                            uploadVideoMutation.mutate(file);
+                            // Reset input value
+                            if (videoInputRef.current) {
+                              videoInputRef.current.value = '';
+                            }
+                          }
+                        }}
+                      />
+                      <label 
+                        htmlFor="video-upload"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer inline-flex items-center"
+                      >
+                        <Upload size={16} className="mr-2" />
+                        Seleccionar video
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center p-4 border border-dashed border-gray-300 rounded-md">
+                  <p className="text-gray-500 mb-2">No hay videos subidos. Sube un video para usar en lugar de las fotos.</p>
+                  
+                  <div className="flex gap-2 mt-2">
+                    <input
+                      type="file"
+                      id="video-upload"
+                      className="hidden"
+                      accept="video/mp4,video/quicktime,video/webm"
+                      ref={videoInputRef}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setVideoFile(file);
+                          setUploadingVideo(true);
+                          uploadVideoMutation.mutate(file);
+                          // Reset input value
+                          if (videoInputRef.current) {
+                            videoInputRef.current.value = '';
+                          }
+                        }
+                      }}
+                    />
+                    <label 
+                      htmlFor="video-upload"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer inline-flex items-center"
+                    >
+                      <Upload size={16} className="mr-2" />
+                      {uploadingVideo ? 'Subiendo...' : 'Seleccionar video'}
+                    </label>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        
+        {/* Música de fondo */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-semibold flex items-center">
+              <Music className="mr-2" size={18} />
+              Música de fondo
+            </h3>
+            <div className="flex items-center">
+              <input 
+                type="checkbox" 
+                id="use-background-music" 
+                checked={useBackgroundMusic} 
+                onChange={(e) => setUseBackgroundMusic(e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="use-background-music" className="ml-2 text-sm text-gray-700">
+                Añadir música de fondo
+              </label>
+            </div>
+          </div>
+          
+          {useBackgroundMusic && (
+            <div className="mt-3 p-4 bg-gray-50 rounded-md">
+              {backgroundMusicQuery.isLoading ? (
+                <div className="animate-pulse space-y-2 p-4">
+                  <div className="h-10 bg-gray-200 rounded mb-2"></div>
+                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                </div>
+              ) : backgroundMusicQuery.data && Array.isArray(backgroundMusicQuery.data) && backgroundMusicQuery.data.length > 0 ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-600 mb-2">Selecciona una música de fondo:</p>
+                  {(backgroundMusicQuery.data as BackgroundMusic[]).map((music: BackgroundMusic) => (
+                    <button
+                      key={music.id}
+                      className={`p-2 border rounded-md w-full text-left flex justify-between items-center ${
+                        selectedBackgroundMusicId === music.id ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                      }`}
+                      onClick={() => setSelectedBackgroundMusicId(music.id)}
+                    >
+                      <div className="flex items-center">
+                        <Disc className="mr-2 text-blue-500" size={16} />
+                        <div>
+                          <p className="font-medium">{music.name}</p>
+                          <p className="text-xs text-gray-500">
+                            Duración: {formatDuration(music.duration || 0)}
+                          </p>
+                        </div>
+                      </div>
+                      {selectedBackgroundMusicId === music.id && (
+                        <Check className="text-blue-500" size={18} />
+                      )}
+                    </button>
+                  ))}
+                  
+                  <div className="mt-3">
+                    <p className="text-sm text-gray-600 mb-2">O sube un nuevo archivo de música:</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="file"
+                        id="music-upload"
+                        className="hidden"
+                        accept="audio/mpeg,audio/wav,audio/mp3"
+                        ref={musicInputRef}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setMusicFile(file);
+                            setMusicName(file.name);
+                            setUploadingMusic(true);
+                            uploadMusicMutation.mutate(file);
+                            // Reset input value
+                            if (musicInputRef.current) {
+                              musicInputRef.current.value = '';
+                            }
+                          }
+                        }}
+                      />
+                      <label 
+                        htmlFor="music-upload"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer inline-flex items-center"
+                      >
+                        <Upload size={16} className="mr-2" />
+                        {uploadingMusic ? 'Subiendo...' : 'Seleccionar música'}
+                      </label>
+                    </div>
+                  </div>
+                  
+                  {selectedBackgroundMusicId && (
+                    <div className="mt-4">
+                      <p className="text-sm text-gray-600 mb-2">Volumen de la música de fondo:</p>
+                      <div className="flex items-center">
+                        <Volume2 className="text-gray-500 mr-2" size={16} />
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={backgroundMusicVolume}
+                          onChange={(e) => setBackgroundMusicVolume(parseFloat(e.target.value))}
+                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                        />
+                        <span className="ml-2 text-sm text-gray-600">
+                          {Math.round(backgroundMusicVolume * 100)}%
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center p-4 border border-dashed border-gray-300 rounded-md">
+                  <p className="text-gray-500 mb-2">No hay música de fondo disponible. Sube un archivo de audio para usar como música de fondo.</p>
+                  
+                  <div className="flex gap-2 mt-2">
+                    <input
+                      type="file"
+                      id="music-upload"
+                      className="hidden"
+                      accept="audio/mpeg,audio/wav,audio/mp3"
+                      ref={musicInputRef}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setMusicFile(file);
+                          setMusicName(file.name);
+                          setUploadingMusic(true);
+                          uploadMusicMutation.mutate(file);
+                          // Reset input value
+                          if (musicInputRef.current) {
+                            musicInputRef.current.value = '';
+                          }
+                        }
+                      }}
+                    />
+                    <label 
+                      htmlFor="music-upload"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer inline-flex items-center"
+                    >
+                      <Upload size={16} className="mr-2" />
+                      {uploadingMusic ? 'Subiendo...' : 'Seleccionar música'}
+                    </label>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         
         {/* Configuración de Título */}

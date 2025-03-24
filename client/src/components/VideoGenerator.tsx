@@ -836,7 +836,9 @@ export default function VideoGenerator({ projectId, photos, audio, onBack }: Vid
               <div className="mt-3">
                 <p className="text-sm font-medium mb-2">Texto del título:</p>
                 <div className="mb-1 flex justify-between items-center">
-                  <span className="text-xs text-gray-600">Puedes usar [nl] para insertar saltos de línea</span>
+                  <div className="text-xs text-gray-600">
+                    <span className="inline-block bg-blue-100 text-blue-800 font-semibold px-1 py-0.5 rounded">Tip:</span> Escribe <span className="font-mono bg-gray-100 px-1 rounded">[nl]</span> para insertar saltos de línea
+                  </div>
                   <span className="text-xs text-gray-600">{titleText.length}/100 caracteres</span>
                 </div>
                 <textarea

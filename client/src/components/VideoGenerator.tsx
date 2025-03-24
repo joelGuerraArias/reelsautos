@@ -664,10 +664,10 @@ export default function VideoGenerator({ projectId, photos, audio, onBack }: Vid
         </div>
         
         {/* Música de fondo */}
-        <div className="mb-6">
+        <div className="mb-6 border-t-2 border-b-2 border-blue-100 py-4 mt-8">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-semibold flex items-center">
-              <Music className="mr-2" size={18} />
+            <h3 className="text-xl font-bold flex items-center text-blue-700">
+              <Music className="mr-2" size={20} />
               Música de fondo
             </h3>
             <div className="flex items-center">
@@ -676,9 +676,9 @@ export default function VideoGenerator({ projectId, photos, audio, onBack }: Vid
                 id="use-background-music" 
                 checked={useBackgroundMusic} 
                 onChange={(e) => setUseBackgroundMusic(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
-              <label htmlFor="use-background-music" className="ml-2 text-sm text-gray-700">
+              <label htmlFor="use-background-music" className="ml-2 text-sm font-medium text-gray-700">
                 Añadir música de fondo
               </label>
             </div>
@@ -835,14 +835,24 @@ export default function VideoGenerator({ projectId, photos, audio, onBack }: Vid
             <>
               <div className="mt-3">
                 <p className="text-sm font-medium mb-2">Texto del título:</p>
-                <input
-                  type="text"
+                <div className="mb-1 flex justify-between items-center">
+                  <span className="text-xs text-gray-600">Puedes usar [nl] para insertar saltos de línea</span>
+                  <span className="text-xs text-gray-600">{titleText.length}/100 caracteres</span>
+                </div>
+                <textarea
                   value={titleText}
                   onChange={(e) => setTitleText(e.target.value)}
                   className="w-full p-2 border border-gray-300 rounded-md text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Escribe el texto que aparecerá sobre la imagen..."
                   maxLength={100}
+                  rows={3}
                 />
+                <div className="mt-2">
+                  <p className="text-sm text-gray-600 mb-1">Vista previa:</p>
+                  <div className="p-3 bg-gray-100 rounded border border-gray-300">
+                    <p className="whitespace-pre-line">{titleText.replace(/\[nl\]/g, '\n')}</p>
+                  </div>
+                </div>
               </div>
               
               <div className="mt-3">

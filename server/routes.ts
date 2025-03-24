@@ -997,10 +997,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let textOverlay = '';
       if (appSettings) {
         // Usar exactamente el texto que el usuario ha configurado
-        const titleText = appSettings.titleText || "";
+        let titleText = appSettings.titleText || "";
+        
+        // Procesar los saltos de línea marcados con [nl]
+        // Reemplazar [nl] con saltos de línea reales
+        titleText = titleText.replace(/\[nl\]/g, '\n');
           
         const textColor = appSettings.titleColor || '#ffffff';
         const fontSize = appSettings.titleFontSize || 36; // Aumentar tamaño por defecto
+        
+        // Escapar comillas simples y procesar múltiples líneas si es necesario
         const text = titleText.replace(/'/g, "\\'"); // Escape single quotes
         
         // Título estilo moderno: caja redondeada con texto centrado como en la imagen
@@ -1009,8 +1015,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const textX = '(w-text_w)/2-20'; // Centrado con margen para el padding del box
         const textY = 'h-120'; // Posición en la parte inferior, pero no muy abajo
         
-        // Estilo moderno: texto blanco sobre fondo rojo semi-transparente con esquinas redondeadas
-        textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=red@0.9:boxborderw=20:shadowx=0:shadowy=0`;
+        if (text.includes('\n')) {
+          // Si el texto tiene múltiples líneas, usamos la directiva de texto con soporte para saltos de línea
+          const escapedText = text.replace(/\n/g, '\\n'); // Escapar saltos de línea para FFmpeg
+          textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${escapedText}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=red@0.9:boxborderw=20:shadowx=0:shadowy=0:line_spacing=10`;
+        } else {
+          // Si es una sola línea, usamos el formato simple
+          textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=red@0.9:boxborderw=20:shadowx=0:shadowy=0`;
+        }
         
         console.log(`Aplicando texto FORZADO: "${text}" con tamaño ${fontSize}px`);
       }

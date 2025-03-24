@@ -584,37 +584,319 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // API para gestionar videos subidos
+  
+  // Validar video
+  app.post("/api/uploaded-videos/validate", videoUpload.single("video"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ isValid: false, error: "No se ha subido ningún archivo" });
+      }
+      
+      // Usar FFmpeg para verificar las dimensiones y duración del video
+      const filePath = req.file.path;
+      
+      // Obtener dimensiones del video
+      const { stdout: dimensionsOutput } = await exec(
+        `ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "${filePath}"`
+      );
+      
+      const [width, height] = dimensionsOutput.trim().split('x').map(Number);
+      
+      // Obtener duración del video
+      const { stdout: durationOutput } = await exec(
+        `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`
+      );
+      
+      const duration = Math.round(parseFloat(durationOutput.trim()));
+      
+      // Verificar relación de aspecto
+      const aspectRatio = width / height;
+      const targetRatio = 16 / 9;
+      const ratioTolerance = 0.1; // Mayor tolerancia para videos
+      
+      if (Math.abs(aspectRatio - targetRatio) > ratioTolerance) {
+        // Eliminar el archivo si no es válido
+        fs.unlinkSync(filePath);
+        return res.status(400).json({
+          isValid: false,
+          error: `Relación de aspecto inválida. Se esperaba 16:9 (${targetRatio.toFixed(2)}), pero es ${aspectRatio.toFixed(2)}`
+        });
+      }
+      
+      res.json({
+        isValid: true,
+        width,
+        height,
+        duration
+      });
+    } catch (error) {
+      console.error("Error al validar el video:", error);
+      
+      // Limpiar el archivo en caso de error
+      if (req.file) {
+        fs.unlinkSync(req.file.path);
+      }
+      
+      res.status(500).json({ isValid: false, error: "No se pudo validar el video" });
+    }
+  });
+  
+  // Subir un video
+  app.post("/api/uploaded-videos", videoUpload.single("video"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No se ha subido ningún archivo" });
+      }
+      
+      // Obtener dimensiones y duración del video
+      const filePath = req.file.path;
+      
+      // Obtener dimensiones
+      const { stdout: dimensionsOutput } = await exec(
+        `ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "${filePath}"`
+      );
+      
+      const [width, height] = dimensionsOutput.trim().split('x').map(Number);
+      
+      // Obtener duración
+      const { stdout: durationOutput } = await exec(
+        `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`
+      );
+      
+      const duration = Math.round(parseFloat(durationOutput.trim()));
+      
+      const videoData = {
+        filename: req.file.originalname,
+        filepath: req.file.path,
+        width,
+        height,
+        size: req.file.size,
+        duration,
+        projectId: req.body.projectId,
+        createdAt: new Date().toISOString(),
+      };
+      
+      const parsedData = insertUploadedVideoSchema.parse(videoData);
+      const video = await storage.createUploadedVideo(parsedData);
+      res.status(201).json(video);
+    } catch (error) {
+      // Limpiar el archivo en caso de error
+      if (req.file) {
+        fs.unlinkSync(req.file.path);
+      }
+      
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        res.status(400).json({ error: validationError.message });
+      } else {
+        console.error("Error al subir el video:", error);
+        res.status(500).json({ error: "No se pudo subir el video" });
+      }
+    }
+  });
+  
+  // Obtener videos subidos por ID de proyecto
+  app.get("/api/projects/:id/uploaded-videos", async (req, res) => {
+    try {
+      const projectId = req.params.id;
+      const videos = await storage.getUploadedVideosByProjectId(projectId);
+      res.json(videos);
+    } catch (error) {
+      res.status(500).json({ error: "No se pudieron obtener los videos" });
+    }
+  });
+  
+  // Eliminar un video subido
+  app.delete("/api/uploaded-videos/:id", async (req, res) => {
+    try {
+      const videoId = parseInt(req.params.id);
+      const video = await storage.getUploadedVideo(videoId);
+      
+      if (!video) {
+        return res.status(404).json({ error: "Video no encontrado" });
+      }
+      
+      // Eliminar el archivo
+      fs.unlinkSync(video.filepath);
+      
+      // Eliminar del almacenamiento
+      const deleted = await storage.deleteUploadedVideo(videoId);
+      
+      if (deleted) {
+        res.status(204).end();
+      } else {
+        res.status(500).json({ error: "No se pudo eliminar el video" });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "No se pudo eliminar el video" });
+    }
+  });
+  
+  // API para gestionar música de fondo
+  
+  // Subir música de fondo
+  app.post("/api/background-music", musicUpload.single("music"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No se ha subido ningún archivo" });
+      }
+      
+      // Obtener duración de la música
+      const filePath = req.file.path;
+      const { stdout } = await exec(
+        `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`
+      );
+      
+      const duration = Math.round(parseFloat(stdout.trim()));
+      
+      const musicData = {
+        name: req.body.name || req.file.originalname,
+        filename: req.file.originalname,
+        filepath: req.file.path,
+        duration,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      const parsedData = insertBackgroundMusicSchema.parse(musicData);
+      const music = await storage.createBackgroundMusic(parsedData);
+      res.status(201).json(music);
+    } catch (error) {
+      // Limpiar el archivo en caso de error
+      if (req.file) {
+        fs.unlinkSync(req.file.path);
+      }
+      
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        res.status(400).json({ error: validationError.message });
+      } else {
+        console.error("Error al subir la música:", error);
+        res.status(500).json({ error: "No se pudo subir la música de fondo" });
+      }
+    }
+  });
+  
+  // Obtener toda la música de fondo
+  app.get("/api/background-music", async (req, res) => {
+    try {
+      const music = await storage.getBackgroundMusic();
+      res.json(music);
+    } catch (error) {
+      res.status(500).json({ error: "No se pudo obtener la música de fondo" });
+    }
+  });
+  
+  // Obtener una música de fondo por ID
+  app.get("/api/background-music/:id", async (req, res) => {
+    try {
+      const musicId = parseInt(req.params.id);
+      const music = await storage.getBackgroundMusicById(musicId);
+      
+      if (!music) {
+        return res.status(404).json({ error: "Música no encontrada" });
+      }
+      
+      res.json(music);
+    } catch (error) {
+      res.status(500).json({ error: "No se pudo obtener la música de fondo" });
+    }
+  });
+  
+  // Eliminar una música de fondo
+  app.delete("/api/background-music/:id", async (req, res) => {
+    try {
+      const musicId = parseInt(req.params.id);
+      const music = await storage.getBackgroundMusicById(musicId);
+      
+      if (!music) {
+        return res.status(404).json({ error: "Música no encontrada" });
+      }
+      
+      // Eliminar el archivo
+      fs.unlinkSync(music.filepath);
+      
+      // Eliminar del almacenamiento
+      const deleted = await storage.deleteBackgroundMusic(musicId);
+      
+      if (deleted) {
+        res.status(204).end();
+      } else {
+        res.status(500).json({ error: "No se pudo eliminar la música de fondo" });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "No se pudo eliminar la música de fondo" });
+    }
+  });
+  
   // Generate video from photos and audio
   app.post("/api/videos", async (req, res) => {
     try {
       const validatedData = generateVideoSchema.parse(req.body);
-      const { photoIds, audioId, projectId } = validatedData;
+      const { 
+        photoIds, 
+        uploadedVideoId, 
+        audioId, 
+        backgroundMusicId, 
+        backgroundMusicVolume, 
+        projectId 
+      } = validatedData;
       
-      // Get the audio and photos
+      // Get the audio
       const audio = await storage.getAudio(audioId);
       if (!audio) {
         return res.status(404).json({ error: "Audio not found" });
       }
       
-      const photos = await Promise.all(
-        photoIds.map(async (id) => await storage.getPhoto(parseInt(id)))
-      );
+      // Verificar si estamos procesando fotos o un video subido
+      let photos = [];
+      let uploadedVideo = null;
       
-      // Ensure all photos exist
-      if (photos.includes(undefined)) {
-        return res.status(404).json({ error: "One or more photos not found" });
+      if (photoIds && photoIds.length > 0) {
+        // Procesar con fotos
+        photos = await Promise.all(
+          photoIds.map(async (id) => await storage.getPhoto(parseInt(id)))
+        );
+        
+        // Ensure all photos exist
+        if (photos.includes(undefined)) {
+          return res.status(404).json({ error: "One or more photos not found" });
+        }
+      } else if (uploadedVideoId) {
+        // Procesar con video subido
+        uploadedVideo = await storage.getUploadedVideo(uploadedVideoId);
+        if (!uploadedVideo) {
+          return res.status(404).json({ error: "Uploaded video not found" });
+        }
+      } else {
+        return res.status(400).json({ error: "Either photos or an uploaded video must be provided" });
       }
+      
+      // Esta validación ya se hizo arriba cuando tenemos photoIds, así que la eliminamos
       
       // Get app settings for logo and text overlay
       const appSettings = await storage.getAppSettings();
       
-      // Calculate duration for each photo
+      // Calculate duration for each photo if we're using photos
       const audioDuration = audio.duration || 0;
-      const photoDuration = audioDuration / photos.length;
+      let photoDuration = 0;
+      if (photos.length > 0) {
+        photoDuration = audioDuration / photos.length;
+      }
       
       // Generate the output video filename
       const outputFilename = `video_${nanoid()}.mp4`;
       const outputPath = path.join(VIDEO_DIR, outputFilename);
+      
+      // Obtener la música de fondo si se especificó
+      let backgroundMusic = null;
+      if (backgroundMusicId) {
+        backgroundMusic = await storage.getBackgroundMusicById(backgroundMusicId);
+        if (!backgroundMusic) {
+          console.warn(`Música de fondo con ID ${backgroundMusicId} no encontrada`);
+        }
+      }
       
       // Simplified approach without zoom effect
       // For multiple photos, create temporary directory for intermediate files
@@ -816,8 +1098,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.warn("Error cleaning up temp files:", e);
           }
         }, 5000);
+      } else if (uploadedVideo && uploadedVideo.filepath) {
+        // Procesar usando un video subido
+        console.log("Procesando con video subido:", uploadedVideo.filename);
+        let command;
+        
+        // Necesitamos sincronizar el audio con el video, potencialmente recortando el video
+        // o añadiendo bucles si es necesario
+        const videoTempPath = path.join(tempDir, `temp_video_${nanoid()}.mp4`);
+        
+        // Primero procesamos el video para aplicar logo y texto
+        if (hasLogo) {
+          // Si hay logo, usamos filtergraph complejo
+          // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
+          const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}${textOverlay}[v]" -map "[v]" -c:v libx264 -pix_fmt yuv420p -shortest "${videoTempPath}"`;
+          await exec(processVideoCommand);
+        } else {
+          // Sin logo, solo aplicamos texto si es necesario
+          const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720${textOverlay}" -c:v libx264 -pix_fmt yuv420p "${videoTempPath}"`;
+          await exec(processVideoCommand);
+        }
+        
+        // Luego combinamos el video procesado con el audio
+        if (backgroundMusic && backgroundMusic.filepath) {
+          // Si hay música de fondo, mezclamos el audio principal con la música
+          const musicVolume = backgroundMusicVolume || 0.2; // Valor por defecto
+          
+          // Crear un archivo temporal para la mezcla de audio
+          const mixedAudioPath = path.join(tempDir, `mixed_audio_${nanoid()}.mp3`);
+          
+          // Mezclar el audio principal con la música de fondo
+          const mixAudioCommand = `ffmpeg -i "${audio.filepath}" -i "${backgroundMusic.filepath}" -filter_complex "[0:a]volume=1.0[a1];[1:a]volume=${musicVolume}[a2];[a1][a2]amix=inputs=2:duration=longest[aout]" -map "[aout]" "${mixedAudioPath}"`;
+          await exec(mixAudioCommand);
+          
+          // Combinar el video procesado con el audio mezclado
+          command = `ffmpeg -i "${videoTempPath}" -i "${mixedAudioPath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;
+          await exec(command);
+          
+          // Limpiar el archivo de audio mezclado
+          fs.unlinkSync(mixedAudioPath);
+        } else {
+          // Sin música de fondo, solo combinamos con el audio principal
+          command = `ffmpeg -i "${videoTempPath}" -i "${audio.filepath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;
+          await exec(command);
+        }
+        
+        // Limpiar el archivo de video temporal
+        fs.unlinkSync(videoTempPath);
       } else {
-        throw new Error("No valid photos provided");
+        throw new Error("No valid photos or uploaded video provided");
       }
       
       // Save the video record

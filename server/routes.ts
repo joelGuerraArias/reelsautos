@@ -1013,7 +1013,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Usamos un estilo de texto tipo "pill" o pastilla con fondo rojo y esquinas redondeadas
         // Perfectamente centrado horizontal y verticalmente
         const textX = '(w-tw)/2'; // Centrado horizontal exacto
-        const textY = 'h/2-(th/2)-30'; // Centrado vertical con ligero desplazamiento hacia arriba
+        const textY = 'h-th-50'; // Posición en la parte baja del video, a 50 píxeles del borde inferior
         
         // Estilo moderno: texto blanco sobre fondo rojo semi-transparente con esquinas redondeadas
         // Corregimos el formato del comando para evitar problemas con el parsing

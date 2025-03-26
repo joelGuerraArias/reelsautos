@@ -30,9 +30,10 @@ interface VideoGeneratorProps {
   photos: Photo[];
   audio: Audio;
   onBack: () => void;
+  uploadedVideos?: UploadedVideo[];
 }
 
-export default function VideoGenerator({ projectId, photos, audio, onBack }: VideoGeneratorProps) {
+export default function VideoGenerator({ projectId, photos, audio, onBack, uploadedVideos }: VideoGeneratorProps) {
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
   

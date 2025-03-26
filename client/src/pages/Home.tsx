@@ -45,6 +45,11 @@ export default function Home() {
     enabled: !!projectId,
   });
   
+  const uploadedVideosQuery = useQuery({
+    queryKey: [`/api/projects/${projectId}/uploaded-videos`],
+    enabled: !!projectId,
+  });
+  
   // Create project mutation
   const createProjectMutation = useMutation({
     mutationFn: async () => {
@@ -124,11 +129,11 @@ export default function Home() {
             </h2>
             
             <div className="bg-blue-50 p-4 mb-6 rounded-lg border border-blue-200">
-              <p className="text-blue-800 font-medium mb-2">Opciones de subida:</p>
-              <ul className="list-disc pl-5 text-blue-700 text-sm space-y-1">
-                <li>Sube <strong>varias fotos</strong> usando el área de abajo (mínimo 1)</li>
-                <li>O sube <strong>un video</strong> directamente en la siguiente pantalla</li>
-              </ul>
+              <p className="text-blue-800 font-medium mb-2">Sube tus archivos:</p>
+              <p className="text-blue-700 text-sm">
+                Para crear tu video, puedes seleccionar entre subir fotos o un video usando las 
+                pestañas de arriba. Ambos métodos funcionan perfectamente para crear tu presentación.
+              </p>
             </div>
             
             <PhotoUploader projectId={projectId} />

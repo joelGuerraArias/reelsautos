@@ -1031,7 +1031,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
           // Separamos el textOverlay en una variable diferente para mejorar la estructura del comando
           const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
-          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[2:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[v]" -map "[v]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[2:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
         } else {
           // Sin logo, solo aplicamos texto si es necesario
           // Usamos scale=increase para llenar completamente el marco y crop para mantener proporciones
@@ -1054,7 +1054,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Si hay logo, usamos filtergraph complejo
               // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
               const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
-              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[v]" -map "[v]" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
+              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
             } else {
               // Sin logo, solo aplicamos texto si es necesario
               // Usamos scale=increase para llenar todo el marco
@@ -1122,7 +1122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Si hay logo, usamos filtergraph complejo
           // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
           const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
-          const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[v]" -map "[v]" -c:v libx264 -pix_fmt yuv420p -shortest "${videoTempPath}"`;
+          const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -c:v libx264 -pix_fmt yuv420p -shortest "${videoTempPath}"`;
           await exec(processVideoCommand);
         } else {
           // Sin logo, solo aplicamos texto si es necesario

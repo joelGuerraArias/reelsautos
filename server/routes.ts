@@ -1016,8 +1016,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const textY = 'h/2-(th/2)-30'; // Centrado vertical con ligero desplazamiento hacia arriba
         
         // Estilo moderno: texto blanco sobre fondo rojo semi-transparente con esquinas redondeadas
-        // Añadimos text_shaping=1 para mejor manejo de texto multilínea
-        textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=red@0.9:boxborderw=20:shadowx=0:shadowy=0:line_spacing=10:text_shaping=1`;
+        // Eliminamos text_shaping=1 ya que no es compatible con todas las versiones de FFmpeg
+        textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=red@0.9:boxborderw=20:shadowx=0:shadowy=0:line_spacing=10`;
         
         console.log(`Aplicando texto con saltos de línea: "${titleText}" con tamaño ${fontSize}px`);
       }

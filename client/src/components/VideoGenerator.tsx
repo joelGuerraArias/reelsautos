@@ -582,7 +582,7 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
               ) : uploadedVideosQuery.data && Array.isArray(uploadedVideosQuery.data) && uploadedVideosQuery.data.length > 0 ? (
                 <div className="space-y-3">
                   <p className="text-sm text-gray-600 mb-2">Selecciona un video subido previamente:</p>
-                  {(uploadedVideosQuery.data as UploadedVideo[]).map((video: UploadedVideo) => (
+                  {uploadedVideosQuery.data && Array.isArray(uploadedVideosQuery.data) && (uploadedVideosQuery.data as UploadedVideo[]).map((video: UploadedVideo) => (
                     <button
                       key={video.id}
                       className={`p-2 border rounded-md w-full text-left flex justify-between items-center ${
@@ -706,7 +706,7 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
               ) : backgroundMusicQuery.data && Array.isArray(backgroundMusicQuery.data) && backgroundMusicQuery.data.length > 0 ? (
                 <div className="space-y-3">
                   <p className="text-sm text-gray-600 mb-2">Selecciona una música de fondo:</p>
-                  {(backgroundMusicQuery.data as BackgroundMusic[]).map((music: BackgroundMusic) => (
+                  {backgroundMusicQuery.data && Array.isArray(backgroundMusicQuery.data) && (backgroundMusicQuery.data as BackgroundMusic[]).map((music: BackgroundMusic) => (
                     <button
                       key={music.id}
                       className={`p-2 border rounded-md w-full text-left flex justify-between items-center ${

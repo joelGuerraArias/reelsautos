@@ -138,7 +138,7 @@ export default function Home() {
             
             <PhotoUploader projectId={projectId} />
             
-            {photosQuery.data && photosQuery.data.length > 0 && (
+            {photosQuery.data && Array.isArray(photosQuery.data) && photosQuery.data.length > 0 && (
               <PhotoPreviewList 
                 photos={photosQuery.data as Photo[]} 
                 projectId={projectId} 

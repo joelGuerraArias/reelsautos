@@ -375,18 +375,32 @@ export default function AudioGenerator({ projectId, photos, onBack }: AudioGener
         <p className="text-xs text-gray-500 mt-1">Este texto será convertido a audio usando Eleven Labs API.</p>
       </div>
       
-      <div className="bg-yellow-50 p-4 rounded-lg mb-4">
-        <div className="flex">
-          <Info className="text-yellow-600 mt-1 mr-2" />
-          <div>
-            <h4 className="font-medium text-yellow-800">Consejos de duración</h4>
-            <p className="text-sm text-yellow-700">
-              Con {photos.length} fotos subidas, intenta crear un texto que genere ~60 segundos de audio para resultados óptimos 
-              (cada foto se mostrará durante ~{photos.length > 0 ? Math.round(60 / photos.length) : 0} segundos).
-            </p>
+      {photos.length > 0 ? (
+        <div className="bg-yellow-50 p-4 rounded-lg mb-4">
+          <div className="flex">
+            <Info className="text-yellow-600 mt-1 mr-2" />
+            <div>
+              <h4 className="font-medium text-yellow-800">Consejos de duración</h4>
+              <p className="text-sm text-yellow-700">
+                Con {photos.length} {photos.length === 1 ? 'foto subida' : 'fotos subidas'}, intenta crear un texto que genere ~60 segundos de audio para resultados óptimos 
+                (cada foto se mostrará durante ~{photos.length > 0 ? Math.round(60 / photos.length) : 0} segundos).
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-amber-50 p-4 rounded-lg mb-4 border border-amber-200">
+          <div className="flex">
+            <Info className="text-amber-600 mt-1 mr-2" />
+            <div>
+              <h4 className="font-medium text-amber-800">Sin fotos subidas</h4>
+              <p className="text-sm text-amber-700">
+                No has subido fotos. Podrás subir un video directamente en la siguiente pantalla. Por ahora, crea el audio para tu video.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="flex items-center justify-between">
         <button 

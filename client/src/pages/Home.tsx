@@ -69,15 +69,8 @@ export default function Home() {
   
   // Navigation functions
   const goToNextStep = () => {
-    // Validate before proceeding
-    if (currentStep === Step.UPLOAD_PHOTOS && (!photosQuery.data || photosQuery.data.length === 0)) {
-      toast({
-        title: "No photos uploaded",
-        description: "Please upload at least one photo before continuing",
-        variant: "destructive"
-      });
-      return;
-    }
+    // No validation needed - user can proceed without photos to upload video later
+    // Skip validation to allow video upload option on next screen
     
     if (currentStep === Step.CREATE_AUDIO && !audioQuery.data) {
       toast({
@@ -164,7 +157,7 @@ export default function Home() {
           <div className="p-6 border-b border-gray-200">
             <h2 className="text-xl font-semibold mb-4 flex items-center">
               <span className="mr-2 text-primary"><Wand2 size={20} /></span>
-              Generate Audio
+              Generar Audio
             </h2>
             
             {!audioQuery.data ? (

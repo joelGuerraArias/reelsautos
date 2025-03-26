@@ -95,11 +95,14 @@ export default function PhotoUploader({ projectId }: PhotoUploaderProps) {
             } rounded-lg p-6 transition-colors cursor-pointer text-center`}
           >
             <input {...getInputProps()} />
-            <Cloud className="w-10 h-10 mx-auto text-gray-400 mb-2" />
-            <p className="mb-2 font-medium">
+            <Cloud className="w-12 h-12 mx-auto text-blue-500 mb-2" />
+            <p className="mb-2 font-semibold text-lg">
               {isDragActive ? "Suelta las fotos aquí" : "Arrastra fotos aquí o haz clic para subir"}
             </p>
-            <p className="text-sm text-gray-500">Formatos soportados: JPG, PNG (tamaño mínimo: 640x360px)</p>
+            <p className="text-sm text-gray-600 mb-2">Formatos soportados: JPG, PNG (tamaño mínimo: 640x360px)</p>
+            <p className="text-xs bg-yellow-50 p-2 rounded border border-yellow-200 inline-block">
+              Si prefieres subir un video directamente, continúa a la siguiente pantalla →
+            </p>
             
             {isUploading && (
               <div className="mt-3">

@@ -127,8 +127,16 @@ export default function Home() {
           <div className="p-6 border-b border-gray-200">
             <h2 className="text-xl font-semibold mb-4 flex items-center">
               <span className="mr-2 text-primary"><Wand2 size={20} /></span>
-              Upload Photos
+              Subir Fotos o Video
             </h2>
+            
+            <div className="bg-blue-50 p-4 mb-6 rounded-lg border border-blue-200">
+              <p className="text-blue-800 font-medium mb-2">Opciones de subida:</p>
+              <ul className="list-disc pl-5 text-blue-700 text-sm space-y-1">
+                <li>Sube <strong>varias fotos</strong> usando el área de abajo (mínimo 1)</li>
+                <li>O sube <strong>un video</strong> directamente en la siguiente pantalla</li>
+              </ul>
+            </div>
             
             <PhotoUploader projectId={projectId} />
             
@@ -141,10 +149,10 @@ export default function Home() {
 
             <div className="flex justify-end mt-6">
               <button 
-                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 transition-colors font-medium flex items-center"
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center"
                 onClick={goToNextStep}
               >
-                Continue
+                Continuar
                 <span className="ml-1">→</span>
               </button>
             </div>

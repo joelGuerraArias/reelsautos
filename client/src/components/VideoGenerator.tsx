@@ -314,7 +314,7 @@ export default function VideoGenerator({ projectId, photos, audio, onBack }: Vid
       <div className="mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Mostrar fotos o video subido según corresponda */}
-          <div className={`bg-gray-50 p-4 rounded-lg ${useUploadedVideo ? 'border border-blue-200' : ''}`}>
+          <div className={`bg-gray-50 p-4 rounded-lg ${useUploadedVideo ? 'border border-blue-200' : photos.length === 0 ? 'border border-amber-200' : ''}`}>
             {useUploadedVideo ? (
               <>
                 <h3 className="font-medium text-gray-800 mb-2 flex items-center">
@@ -331,6 +331,17 @@ export default function VideoGenerator({ projectId, photos, audio, onBack }: Vid
                   ) : (
                     <p className="text-blue-500">Selecciona o sube un video</p>
                   )}
+                </div>
+              </>
+            ) : photos.length === 0 ? (
+              <>
+                <h3 className="font-medium text-amber-800 mb-2 flex items-center">
+                  <FileVideo className="w-4 h-4 mr-1 text-amber-600" />
+                  Sube un Video
+                </h3>
+                <div className="text-amber-700">
+                  <p className="mb-1">No hay fotos subidas, usa un video en su lugar.</p>
+                  <p>El audio generado se combinará con tu video.</p>
                 </div>
               </>
             ) : (

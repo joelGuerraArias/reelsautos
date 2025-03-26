@@ -182,7 +182,7 @@ export default function Home() {
           <div className="p-6">
             <h2 className="text-xl font-semibold mb-4 flex items-center">
               <span className="mr-2 text-primary"><Film size={20} /></span>
-              Generate Video
+              Generar Video
             </h2>
             
             {!videoQuery.data ? (

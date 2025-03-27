@@ -1035,9 +1035,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const textY = 'h-th-150'; // Subimos la posición un 25% aproximadamente (desde 50px a 150px del borde inferior)
           
           // Estilo moderno: texto blanco sobre fondo con color configurable y esquinas redondeadas
-          // Añadimos un radio de 10px a las esquinas según lo solicitado
+          // FFmpeg drawtext no soporta directamente bordes redondeados para el fondo
+          // Usamos un padding generoso (boxborderw) para simular bordes redondeados
+          // Debemos crear una solución alternativa usando un rectángulo con bordes redondeados
           // El color del fondo es configurable pero el texto siempre es blanco
-          textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=red@0.9:boxborderw=20:borderw=10:shadowx=0:shadowy=0:line_spacing=10`;
+          textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=red@0.9:boxborderw=10`;
           
           console.log(`Aplicando texto con saltos de línea: "${titleText}" con tamaño ${fontSize}px`);
         }

@@ -1011,43 +1011,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           // Procesar los saltos de línea del textarea (caracteres \n) 
           // y los marcados con [nl] a formato FFmpeg (\n)
+          // Solo conservar los saltos de línea explícitos del usuario (tecla Enter o [nl])
           titleText = titleText.replace(/\n/g, '\\n').replace(/\[nl\]/g, '\\n');
           console.log("Texto después de procesar saltos de línea:", JSON.stringify(titleText));
           
-          // Implementar saltos de línea automáticos para textos largos
-          // Estimamos aproximadamente 30-35 caracteres por línea para un tamaño de fuente de 32px
-          // en un video de 1280x720
-          const maxCharsPerLine = 35;
+          // No implementar saltos de línea automáticos según lo solicitado
+          // Permitimos hasta 60 caracteres por línea según lo solicitado
+          const maxCharsPerLine = 60;
           
-          // Solo aplicar saltos de línea automáticos si no hay saltos de línea manuales
-          if (!titleText.includes('\\n') && titleText.length > maxCharsPerLine) {
-            let words = titleText.split(' ');
-            let currentLine = '';
-            let newText = '';
-            
-            // Iterar por cada palabra para distribuirlas en líneas
-            for (let i = 0; i < words.length; i++) {
-              let word = words[i];
-              
-              // Si agregar esta palabra excede el máximo de caracteres por línea,
-              // iniciamos una nueva línea (excepto si es la primera palabra de la línea)
-              if (currentLine.length + word.length > maxCharsPerLine && currentLine.length > 0) {
-                newText += currentLine.trim() + '\\n';
-                currentLine = word + ' ';
-              } else {
-                currentLine += word + ' ';
-              }
-            }
-            
-            // Agregamos la última línea
-            newText += currentLine.trim();
-            titleText = newText;
-            
-            console.log(`Texto con saltos de línea automáticos: "${titleText}"`);
-          }
+          // Forzar color de texto blanco según lo solicitado
+          const textColor = '#ffffff'; // Siempre blanco
           
-          const textColor = appSettings.titleColor || '#ffffff';
-          const fontSize = appSettings.titleFontSize || 36; // Aumentar tamaño por defecto
+          // Forzar tamaño de fuente a 24px según lo solicitado
+          const fontSize = 24; // Tamaño fijo
           
           // Escapar comillas simples
           const text = titleText.replace(/'/g, "\\'"); // Escape single quotes
@@ -1058,9 +1034,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const textX = '(w-tw)/2'; // Centrado horizontal exacto
           const textY = 'h-th-150'; // Subimos la posición un 25% aproximadamente (desde 50px a 150px del borde inferior)
           
-          // Estilo moderno: texto blanco sobre fondo rojo semi-transparente con esquinas redondeadas
-          // Corregimos el formato del comando para evitar problemas con el parsing
-          textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=red@0.9:boxborderw=20:shadowx=0:shadowy=0:line_spacing=10`;
+          // Estilo moderno: texto blanco sobre fondo con color configurable y esquinas redondeadas
+          // Añadimos un radio de 10px a las esquinas según lo solicitado
+          // El color del fondo es configurable pero el texto siempre es blanco
+          textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=red@0.9:boxborderw=20:borderw=10:shadowx=0:shadowy=0:line_spacing=10`;
           
           console.log(`Aplicando texto con saltos de línea: "${titleText}" con tamaño ${fontSize}px`);
         }

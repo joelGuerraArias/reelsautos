@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { AppSettings, Logo } from "@shared/schema";
+import { SavedLogos } from "./SavedLogos";
 import { 
   Image, 
   Type, 
@@ -182,6 +183,16 @@ export default function VideoSettings({ onClose }: VideoSettingsProps) {
           <Image className="mr-2" size={18} />
           Logo
         </h3>
+        
+        {/* Logos Favoritos */}
+        {logosQuery.data && Array.isArray(logosQuery.data) && logosQuery.data.length > 0 && (
+          <>
+            <SavedLogos 
+              onSelectLogo={(logoId) => setSelectedLogoId(logoId)} 
+              selectedLogoId={selectedLogoId || undefined} 
+            />
+          </>
+        )}
         
         {logosQuery.isLoading ? (
           <div className="animate-pulse space-y-2">

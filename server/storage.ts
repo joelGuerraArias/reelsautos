@@ -7,6 +7,7 @@ import {
   UserPreferences, InsertUserPreferences,
   SavedVoice, InsertSavedVoice,
   Logo, InsertLogo,
+  SavedLogo, InsertSavedLogo,
   AppSettings, InsertAppSettings,
   BackgroundMusic, InsertBackgroundMusic,
   UploadedVideo, InsertUploadedVideo
@@ -59,6 +60,15 @@ export interface IStorage {
   createLogo(logo: InsertLogo): Promise<Logo>;
   deleteLogo(id: number): Promise<boolean>;
   
+  // Saved Logos methods
+  getSavedLogos(): Promise<SavedLogo[]>;
+  getSavedLogo(id: number): Promise<SavedLogo | undefined>;
+  getSavedLogoByPosition(position: number): Promise<SavedLogo | undefined>;
+  getDefaultSavedLogo(): Promise<SavedLogo | undefined>;
+  saveSavedLogo(logo: InsertSavedLogo): Promise<SavedLogo>;
+  updateSavedLogo(id: number, logo: Partial<InsertSavedLogo>): Promise<SavedLogo>;
+  deleteSavedLogo(id: number): Promise<boolean>;
+  
   // App Settings methods
   getAppSettings(): Promise<AppSettings | undefined>;
   saveAppSettings(settings: InsertAppSettings): Promise<AppSettings>;
@@ -86,6 +96,7 @@ export class MemStorage implements IStorage {
   private userPreferences: UserPreferences | undefined;
   private savedVoices: Map<number, SavedVoice>;
   private logos: Map<number, Logo>;
+  private savedLogos: Map<number, SavedLogo>;
   private appSettings: AppSettings | undefined;
   private backgroundMusics: Map<number, BackgroundMusic>;
   private uploadedVideos: Map<number, UploadedVideo>;
@@ -101,6 +112,8 @@ export class MemStorage implements IStorage {
   private backgroundMusicId: number;
   private uploadedVideoId: number;
 
+  private savedLogoId: number;
+
   constructor() {
     this.users = new Map();
     this.projects = new Map();
@@ -109,6 +122,7 @@ export class MemStorage implements IStorage {
     this.videos = new Map();
     this.savedVoices = new Map();
     this.logos = new Map();
+    this.savedLogos = new Map();
     this.backgroundMusics = new Map();
     this.uploadedVideos = new Map();
     
@@ -119,6 +133,7 @@ export class MemStorage implements IStorage {
     this.preferenceId = 1;
     this.savedVoiceId = 1;
     this.logoId = 1;
+    this.savedLogoId = 1;
     this.appSettingsId = 1;
     this.backgroundMusicId = 1;
     this.uploadedVideoId = 1;
@@ -355,6 +370,94 @@ export class MemStorage implements IStorage {
   
   async deleteLogo(id: number): Promise<boolean> {
     return this.logos.delete(id);
+  }
+  
+  // Saved Logos methods
+  async getSavedLogos(): Promise<SavedLogo[]> {
+    return Array.from(this.savedLogos.values());
+  }
+  
+  async getSavedLogo(id: number): Promise<SavedLogo | undefined> {
+    return this.savedLogos.get(id);
+  }
+  
+  async getSavedLogoByPosition(position: number): Promise<SavedLogo | undefined> {
+    return Array.from(this.savedLogos.values()).find(
+      logo => logo.position === position
+    );
+  }
+  
+  async getDefaultSavedLogo(): Promise<SavedLogo | undefined> {
+    return Array.from(this.savedLogos.values()).find(
+      logo => logo.isDefault === true
+    );
+  }
+  
+  async saveSavedLogo(savedLogo: InsertSavedLogo): Promise<SavedLogo> {
+    const id = this.savedLogoId++;
+    
+    // Asegurarse de que todos los campos requeridos estén presentes
+    const newLogo: SavedLogo = { 
+      ...savedLogo, 
+      id,
+      position: savedLogo.position ?? 0,
+      isDefault: savedLogo.isDefault ?? false
+    };
+    
+    // Si es marcado como default, actualizar cualquier otro logo default a false
+    if (newLogo.isDefault) {
+      for (const [logoId, existingLogo] of Array.from(this.savedLogos.entries())) {
+        if (existingLogo.isDefault && logoId !== id) {
+          this.savedLogos.set(logoId, { ...existingLogo, isDefault: false });
+        }
+      }
+    }
+    
+    // Asegurarse que no haya duplicados en la misma posición
+    for (const [logoId, existingLogo] of Array.from(this.savedLogos.entries())) {
+      if (existingLogo.position === newLogo.position && logoId !== id) {
+        // Mover el logo existente a otra posición
+        const newPosition = (existingLogo.position + 1) % 3;
+        this.savedLogos.set(logoId, { ...existingLogo, position: newPosition });
+      }
+    }
+    
+    this.savedLogos.set(id, newLogo);
+    return newLogo;
+  }
+  
+  async updateSavedLogo(id: number, savedLogo: Partial<InsertSavedLogo>): Promise<SavedLogo> {
+    const existingLogo = this.savedLogos.get(id);
+    if (!existingLogo) {
+      throw new Error(`Logo with id ${id} not found`);
+    }
+    
+    // Si se actualiza a default, actualizar cualquier otro logo default a false
+    if (savedLogo.isDefault) {
+      for (const [logoId, otherLogo] of Array.from(this.savedLogos.entries())) {
+        if (otherLogo.isDefault && logoId !== id) {
+          this.savedLogos.set(logoId, { ...otherLogo, isDefault: false });
+        }
+      }
+    }
+    
+    // Asegurarse que no haya duplicados en la misma posición
+    if (typeof savedLogo.position === 'number' && savedLogo.position !== existingLogo.position) {
+      for (const [logoId, otherLogo] of Array.from(this.savedLogos.entries())) {
+        if (otherLogo.position === savedLogo.position && logoId !== id) {
+          // Mover el otro logo a la posición del logo actual
+          this.savedLogos.set(logoId, { ...otherLogo, position: existingLogo.position });
+        }
+      }
+    }
+    
+    const updatedLogo: SavedLogo = { ...existingLogo, ...savedLogo };
+    this.savedLogos.set(id, updatedLogo);
+    return updatedLogo;
+  }
+  
+  async deleteSavedLogo(id: number): Promise<boolean> {
+    return this.savedLogos.delete(id);
   }
   
   // App Settings methods

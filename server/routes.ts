@@ -1476,6 +1476,155 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get all saved logos
+  app.get("/api/saved-logos", async (req, res) => {
+    try {
+      const logos = await storage.getSavedLogos();
+      res.json(logos);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get saved logos" });
+    }
+  });
+  
+  // Get saved logo by ID
+  app.get("/api/saved-logos/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const logo = await storage.getSavedLogo(id);
+      
+      if (!logo) {
+        return res.status(404).json({ error: "Saved logo not found" });
+      }
+      
+      res.json(logo);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get saved logo" });
+    }
+  });
+  
+  // Get saved logo by position (0, 1, 2)
+  app.get("/api/saved-logos-by-position/:position", async (req, res) => {
+    try {
+      const position = parseInt(req.params.position);
+      
+      if (isNaN(position) || position < 0 || position > 2) {
+        return res.status(400).json({ error: "Invalid position. Must be 0, 1, or 2" });
+      }
+      
+      const logo = await storage.getSavedLogoByPosition(position);
+      
+      if (!logo) {
+        return res.status(404).json({ error: "No logo saved at this position" });
+      }
+      
+      res.json(logo);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get saved logo" });
+    }
+  });
+  
+  // Get default saved logo
+  app.get("/api/saved-logos-default", async (req, res) => {
+    try {
+      const logo = await storage.getDefaultSavedLogo();
+      
+      if (!logo) {
+        return res.status(404).json({ error: "No default logo set" });
+      }
+      
+      res.json(logo);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get default logo" });
+    }
+  });
+  
+  // Save a logo
+  app.post("/api/saved-logos", async (req, res) => {
+    try {
+      const { logoId, name, position, isDefault } = req.body;
+      
+      if (!logoId || !name) {
+        return res.status(400).json({ error: "Logo ID and name are required" });
+      }
+      
+      // Verificar si existe el logo
+      const logo = await storage.getLogo(logoId);
+      if (!logo) {
+        return res.status(404).json({ error: "Logo not found" });
+      }
+      
+      const timestamp = new Date().toISOString();
+      
+      const savedLogo = await storage.saveSavedLogo({
+        logoId,
+        name,
+        position: position !== undefined ? position : 0,
+        isDefault: isDefault !== undefined ? isDefault : false,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      });
+      
+      res.status(201).json(savedLogo);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to save logo" });
+    }
+  });
+  
+  // Update a saved logo
+  app.patch("/api/saved-logos/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { logoId, name, position, isDefault } = req.body;
+      
+      // Verificar si existe el logo guardado
+      const existingLogo = await storage.getSavedLogo(id);
+      if (!existingLogo) {
+        return res.status(404).json({ error: "Saved logo not found" });
+      }
+      
+      // Preparar los datos a actualizar
+      const timestamp = new Date().toISOString();
+      const updateData: any = {
+        updatedAt: timestamp
+      };
+      
+      if (logoId !== undefined) {
+        // Verificar si existe el nuevo logo
+        const logo = await storage.getLogo(logoId);
+        if (!logo) {
+          return res.status(404).json({ error: "Logo not found" });
+        }
+        updateData.logoId = logoId;
+      }
+      if (name !== undefined) updateData.name = name;
+      if (position !== undefined) updateData.position = position;
+      if (isDefault !== undefined) updateData.isDefault = isDefault;
+      
+      // Actualizar el logo
+      const updatedLogo = await storage.updateSavedLogo(id, updateData);
+      
+      res.json(updatedLogo);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update saved logo" });
+    }
+  });
+  
+  // Delete a saved logo
+  app.delete("/api/saved-logos/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const result = await storage.deleteSavedLogo(id);
+      
+      if (!result) {
+        return res.status(404).json({ error: "Logo not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete saved logo" });
+    }
+  });
+  
   // Get app settings
   app.get("/api/app-settings", async (req, res) => {
     try {

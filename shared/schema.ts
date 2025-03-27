@@ -153,6 +153,24 @@ export const insertLogoSchema = createInsertSchema(logos).omit({
 export type InsertLogo = z.infer<typeof insertLogoSchema>;
 export type Logo = typeof logos.$inferSelect;
 
+// Schema de logos favoritos (similar a savedVoices)
+export const savedLogos = pgTable("saved_logos", {
+  id: serial("id").primaryKey(),
+  logoId: integer("logo_id").notNull(),
+  name: text("name").notNull(),
+  position: integer("position").notNull().default(0), // 0, 1, o 2 (para las 3 posiciones)
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const insertSavedLogoSchema = createInsertSchema(savedLogos).omit({
+  id: true,
+});
+
+export type InsertSavedLogo = z.infer<typeof insertSavedLogoSchema>;
+export type SavedLogo = typeof savedLogos.$inferSelect;
+
 export const appSettings = pgTable("app_settings", {
   id: serial("id").primaryKey(),
   selectedLogoId: integer("selected_logo_id"), // Ahora apunta al ID de la tabla logos

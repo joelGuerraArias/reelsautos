@@ -1002,6 +1002,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Procesar los saltos de línea marcados con [nl]
         // Reemplazar [nl] con saltos de línea reales para FFmpeg
         titleText = titleText.replace(/\[nl\]/g, '\\n');
+        
+        // Implementar saltos de línea automáticos para textos largos
+        // Estimamos aproximadamente 30-35 caracteres por línea para un tamaño de fuente de 32px
+        // en un video de 1280x720
+        const maxCharsPerLine = 35;
+        
+        // Solo aplicar saltos de línea automáticos si no hay saltos de línea manuales
+        if (!titleText.includes('\\n') && titleText.length > maxCharsPerLine) {
+          let words = titleText.split(' ');
+          let currentLine = '';
+          let newText = '';
+          
+          // Iterar por cada palabra para distribuirlas en líneas
+          for (let i = 0; i < words.length; i++) {
+            let word = words[i];
+            
+            // Si agregar esta palabra excede el máximo de caracteres por línea,
+            // iniciamos una nueva línea (excepto si es la primera palabra de la línea)
+            if (currentLine.length + word.length > maxCharsPerLine && currentLine.length > 0) {
+              newText += currentLine.trim() + '\\n';
+              currentLine = word + ' ';
+            } else {
+              currentLine += word + ' ';
+            }
+          }
+          
+          // Agregamos la última línea
+          newText += currentLine.trim();
+          titleText = newText;
+          
+          console.log(`Texto con saltos de línea automáticos: "${titleText}"`);
+        }
           
         const textColor = appSettings.titleColor || '#ffffff';
         const fontSize = appSettings.titleFontSize || 36; // Aumentar tamaño por defecto
@@ -1013,7 +1045,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Usamos un estilo de texto tipo "pill" o pastilla con fondo rojo y esquinas redondeadas
         // Perfectamente centrado horizontal y verticalmente
         const textX = '(w-tw)/2'; // Centrado horizontal exacto
-        const textY = 'h-th-50'; // Posición en la parte baja del video, a 50 píxeles del borde inferior
+        const textY = 'h-th-150'; // Subimos la posición un 25% aproximadamente (desde 50px a 150px del borde inferior)
         
         // Estilo moderno: texto blanco sobre fondo rojo semi-transparente con esquinas redondeadas
         // Corregimos el formato del comando para evitar problemas con el parsing

@@ -350,14 +350,17 @@ export default function VideoSettings({ onClose }: VideoSettingsProps) {
           <>
             <div className="mt-3">
               <p className="text-sm font-medium mb-2">Texto del título:</p>
-              <input
-                type="text"
+              <textarea
                 value={titleText}
                 onChange={(e) => setTitleText(e.target.value)}
                 className="w-full p-2 border border-gray-300 rounded-md text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Escribe el texto que aparecerá sobre la imagen..."
+                placeholder="Escribe el texto que aparecerá sobre la imagen. Pulsa Enter para crear saltos de línea."
                 maxLength={100}
+                rows={3}
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Presiona Enter para crear un salto de línea. Cada línea aparecerá en una línea separada en el video.
+              </p>
             </div>
             
             <div className="mt-3">

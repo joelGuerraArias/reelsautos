@@ -999,9 +999,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Usar exactamente el texto que el usuario ha configurado
         let titleText = appSettings.titleText || "";
         
-        // Procesar los saltos de línea marcados con [nl]
-        // Reemplazar [nl] con saltos de línea reales para FFmpeg
-        titleText = titleText.replace(/\[nl\]/g, '\\n');
+        // Procesar los saltos de línea del textarea (caracteres \n) 
+        // y los marcados con [nl] a formato FFmpeg (\n)
+        titleText = titleText.replace(/\n/g, '\\n').replace(/\[nl\]/g, '\\n');
         
         // Implementar saltos de línea automáticos para textos largos
         // Estimamos aproximadamente 30-35 caracteres por línea para un tamaño de fuente de 32px

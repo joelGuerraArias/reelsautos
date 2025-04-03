@@ -238,6 +238,14 @@ export default function VideoSettings({
       const file = files[0];
       setLogoFile(file);
       setLogoName(file.name);
+      
+      // Subir automáticamente cuando se selecciona un archivo
+      const formData = new FormData();
+      formData.append('logo', file); // Nombre correcto que espera el backend
+      formData.append('name', file.name);
+      
+      setUploadingLogo(true);
+      uploadLogoMutation.mutate(formData);
     }
   };
   
@@ -246,7 +254,7 @@ export default function VideoSettings({
     
     setUploadingLogo(true);
     const formData = new FormData();
-    formData.append('logo', logoFile); // Cambiar 'file' a 'logo' para que coincida con el backend
+    formData.append('logo', logoFile); // Nombre correcto que espera el backend
     formData.append('name', logoName || logoFile.name);
     
     uploadLogoMutation.mutate(formData);
@@ -710,14 +718,21 @@ export default function VideoSettings({
                 <div className="mt-3">
                   <label className="inline-flex items-center justify-center w-full px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer">
                     <ImagePlus className="w-4 h-4 mr-2" />
-                    Subir nuevo logo
+                    {uploadingLogo ? 'Subiendo...' : 'Subir nuevo logo'}
                     <input
                       type="file"
                       className="hidden"
                       accept="image/*"
                       onChange={handleLogoUpload}
+                      disabled={uploadingLogo}
                     />
                   </label>
+                  {uploadingLogo && (
+                    <div className="flex items-center justify-center mt-2">
+                      <Loader2 className="w-5 h-5 animate-spin text-blue-500 mr-2" />
+                      <span className="text-sm text-blue-600">Subiendo imagen...</span>
+                    </div>
+                  )}
                 </div>
               )}
               

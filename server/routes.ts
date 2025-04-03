@@ -225,6 +225,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to get project" });
     }
   });
+  
+  // Update project by ID
+  app.patch("/api/projects/:id", async (req, res) => {
+    try {
+      const projectId = req.params.id;
+      const project = await storage.getProject(projectId);
+      
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      
+      // Campos que se pueden actualizar
+      const updatable = [
+        'title', 'selectedVoiceId', 'selectedLogoId', 'logoPosition', 
+        'showTitle', 'titleFontSize', 'titleColor', 'titlePosition',
+        'backgroundMusicId', 'backgroundMusicVolume', 'useUploadedVideo',
+        'isTemplate'
+      ];
+      
+      // Construir objeto con sólo los campos permitidos
+      const updates: any = {};
+      for (const field of updatable) {
+        if (req.body[field] !== undefined) {
+          updates[field] = req.body[field];
+        }
+      }
+      
+      // Realizar la actualización
+      const updatedProject = {
+        ...project,
+        ...updates
+      };
+      
+      // No tenemos un método específico en el storage para actualizar proyectos
+      // así que lo hacemos directamente en el Map de la clase MemStorage
+      // Nota: Esto es una solución temporal, en una implementación real
+      // tendríamos un método updateProject en el storage
+      storage.projects.set(projectId, updatedProject);
+      
+      res.json(updatedProject);
+    } catch (error) {
+      console.error("Error updating project:", error);
+      res.status(500).json({ error: "Failed to update project" });
+    }
+  });
+  
+  // Obtener la plantilla más reciente (último proyecto con isTemplate=true)
+  app.get("/api/templates/latest", async (req, res) => {
+    try {
+      // No tenemos un método específico en el storage, así que implementamos la lógica aquí
+      // En una aplicación real, esto estaría en el storage
+      let latestTemplate = null;
+      let latestDate = "";
+      
+      for (const [_, project] of storage.projects.entries()) {
+        if (project.isTemplate && project.createdAt > latestDate) {
+          latestTemplate = project;
+          latestDate = project.createdAt;
+        }
+      }
+      
+      if (latestTemplate) {
+        return res.json(latestTemplate);
+      }
+      
+      // Si no hay plantillas, devolver un 404
+      return res.status(404).json({ error: "No templates found" });
+    } catch (error) {
+      console.error("Error getting latest template:", error);
+      res.status(500).json({ error: "Failed to get latest template" });
+    }
+  });
 
   // Validate image dimensions
   app.post("/api/photos/validate", photoUpload.single("photo"), async (req, res) => {
@@ -1293,7 +1365,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Video not found" });
       }
       
-      res.download(video.filepath, video.filename);
+      // Obtener la configuración para usar el título como nombre de archivo
+      const appSettings = await storage.getAppSettings();
+      let downloadFilename = video.filename;
+      
+      // Si hay un título en la configuración, usarlo como nombre de archivo
+      if (appSettings && appSettings.titleText && appSettings.titleText.trim()) {
+        // Limpiar el texto del título para un nombre de archivo válido
+        let cleanTitle = appSettings.titleText
+          .replace(/[\r\n\\\/\:\*\?\"\<\>\|]/g, '_') // Reemplazar caracteres no válidos
+          .replace(/\s+/g, '_') // Reemplazar espacios con guiones bajos
+          .substring(0, 100); // Limitar longitud
+          
+        downloadFilename = `${cleanTitle}.mp4`;
+      }
+      
+      res.download(video.filepath, downloadFilename);
     } catch (error) {
       res.status(500).json({ error: "Failed to download video" });
     }

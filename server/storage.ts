@@ -88,8 +88,12 @@ export interface IStorage {
 }
 
 export class MemStorage implements IStorage {
+  // Propiedades de acceso publico para poder actualizar directamente
+  // (en una implementación real estas serían privadas y se usarían métodos adecuados)
+  public projects: Map<string, Project>;
+  
+  // Propiedades privadas
   private users: Map<number, User>;
-  private projects: Map<string, Project>;
   private photos: Map<number, Photo>;
   private audios: Map<number, Audio>;
   private videos: Map<number, Video>;

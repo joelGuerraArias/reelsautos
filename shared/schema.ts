@@ -82,6 +82,18 @@ export const projects = pgTable("projects", {
   id: text("id").primaryKey(),
   title: text("title").notNull(),
   createdAt: text("created_at").notNull(),
+  // Configuración guardada del proyecto
+  selectedVoiceId: text("selected_voice_id"),
+  selectedLogoId: integer("selected_logo_id"),
+  logoPosition: text("logo_position"),
+  showTitle: boolean("show_title"),
+  titleFontSize: integer("title_font_size"),
+  titleColor: text("title_color"),
+  titlePosition: text("title_position"),
+  backgroundMusicId: integer("background_music_id"),
+  backgroundMusicVolume: integer("background_music_volume"),
+  useUploadedVideo: boolean("use_uploaded_video"),
+  isTemplate: boolean("is_template").default(false), // Si es plantilla para reutilizar
 });
 
 export const insertProjectSchema = createInsertSchema(projects);

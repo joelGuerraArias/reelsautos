@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { nanoid } from "nanoid";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -52,14 +52,47 @@ export default function Home() {
     enabled: !!projectId,
   });
   
+  // Obtener el proyecto actual
+  const projectQuery = useQuery({
+    queryKey: [`/api/projects/${projectId}`],
+    enabled: !!projectId,
+  });
+
+  // Obtener plantilla más reciente (proyecto con isTemplate=true)
+  const templateQuery = useQuery({
+    queryKey: ['/api/templates/latest'],
+    enabled: false // Lo activaremos cuando sea necesario
+  });
+  
   // Create project mutation
   const createProjectMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest('POST', '/api/projects', {
+    mutationFn: async (useTemplate: boolean = false) => {
+      const newProject = {
         id: projectId,
         title: `Project ${new Date().toLocaleDateString()}`,
         createdAt: new Date().toISOString()
-      });
+      };
+      
+      // Si hay una plantilla y queremos usarla, copiar sus configuraciones
+      if (useTemplate && templateQuery.data) {
+        const template = templateQuery.data;
+        
+        // Copiar configuraciones relevantes de la plantilla al nuevo proyecto
+        Object.assign(newProject, {
+          selectedVoiceId: template.selectedVoiceId,
+          selectedLogoId: template.selectedLogoId,
+          logoPosition: template.logoPosition,
+          showTitle: template.showTitle,
+          titleFontSize: template.titleFontSize,
+          titleColor: template.titleColor,
+          titlePosition: template.titlePosition,
+          backgroundMusicId: template.backgroundMusicId,
+          backgroundMusicVolume: template.backgroundMusicVolume,
+          useUploadedVideo: template.useUploadedVideo
+        });
+      }
+      
+      return apiRequest('POST', '/api/projects', newProject);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
@@ -70,9 +103,21 @@ export default function Home() {
   });
   
   // Initialize project if it doesn't exist
-  if (!createProjectMutation.isPending && !createProjectMutation.isSuccess) {
-    createProjectMutation.mutate();
-  }
+  useEffect(() => {
+    // Si estamos empezando y no se está creando un proyecto ni ha sido creado ya
+    if (!createProjectMutation.isPending && !createProjectMutation.isSuccess && !projectQuery.data) {
+      // Intentar obtener la plantilla más reciente
+      templateQuery.refetch().then(result => {
+        if (result.data) {
+          // Hay plantilla, usarla para el nuevo proyecto
+          createProjectMutation.mutate(true);
+        } else {
+          // No hay plantilla, crear proyecto sin ella
+          createProjectMutation.mutate(false);
+        }
+      });
+    }
+  }, [createProjectMutation.isPending, createProjectMutation.isSuccess, projectQuery.data]);
   
   // Navigation functions
   const goToNextStep = () => {
@@ -106,12 +151,20 @@ export default function Home() {
     // Clear cached data
     queryClient.invalidateQueries();
     
-    // Create the new project
-    createProjectMutation.mutate();
-    
-    toast({
-      title: "New project created",
-      description: "You can now start uploading photos",
+    // Intentar obtener la plantilla más reciente
+    templateQuery.refetch().then(result => {
+      if (result.data) {
+        // Hay plantilla, usarla para el nuevo proyecto
+        createProjectMutation.mutate(true);
+      } else {
+        // No hay plantilla, crear proyecto sin ella
+        createProjectMutation.mutate(false);
+      }
+      
+      toast({
+        title: "Nuevo proyecto creado",
+        description: "Puedes comenzar a subir fotos",
+      });
     });
   };
   
@@ -225,6 +278,7 @@ export default function Home() {
                 audio={audioQuery.data as Audio}
                 onBack={goToPreviousStep}
                 onNewProject={startNewProject}
+                projectId={projectId}
               />
             )}
           </div>

@@ -11,16 +11,28 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
+  options?: { isFormData?: boolean }
 ): Promise<Response> {
+  // Si es FormData, no establecemos Content-Type para que el navegador establezca
+  // el boundary correcto para multipart/form-data
+  const headers = options?.isFormData 
+    ? {} 
+    : data ? { "Content-Type": "application/json" } : {};
+  
+  const body = options?.isFormData 
+    ? data 
+    : data ? JSON.stringify(data) : undefined;
+  
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
+    headers,
+    body: body as BodyInit | undefined,
     credentials: "include",
   });
 
   await throwIfResNotOk(res);
-  return res;
+  const jsonRes = await res.json().catch(() => ({}));
+  return { ...res, ...jsonRes };
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";

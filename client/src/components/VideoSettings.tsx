@@ -145,9 +145,18 @@ export default function VideoSettings({
   // Subir un nuevo logo
   const uploadLogoMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      return apiRequest("POST", "/api/logos", formData, {
-        isFormData: true
+      // Usar fetch directamente para depurar mejor el error
+      const res = await fetch("/api/logos", {
+        method: "POST",
+        body: formData,
       });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Error al subir el logo");
+      }
+      
+      return await res.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/logos'] });

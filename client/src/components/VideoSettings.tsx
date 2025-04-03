@@ -246,7 +246,7 @@ export default function VideoSettings({
     
     setUploadingLogo(true);
     const formData = new FormData();
-    formData.append('file', logoFile);
+    formData.append('logo', logoFile); // Cambiar 'file' a 'logo' para que coincida con el backend
     formData.append('name', logoName || logoFile.name);
     
     uploadLogoMutation.mutate(formData);

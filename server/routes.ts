@@ -1039,7 +1039,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Usamos un padding generoso (boxborderw) para simular bordes redondeados
           // Debemos crear una solución alternativa usando un rectángulo con bordes redondeados
           // El color del fondo es configurable pero el texto siempre es blanco
-          textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${text}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=red@0.9:boxborderw=10`;
+          // Escapar las comillas simples y dobles para evitar problemas con FFmpeg
+          const escapedText = text.replace(/'/g, "'\\''").replace(/"/g, '\\"');
+          textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${escapedText}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=red@0.9:boxborderw=10`;
           
           console.log(`Aplicando texto con saltos de línea: "${titleText}" con tamaño ${fontSize}px`);
         }
@@ -1145,7 +1147,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Si hay logo, usamos filtergraph complejo
           // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
           const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
+          // Usar comillas dobles para escapar el texto dentro del comando FFmpeg
           const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -c:v libx264 -pix_fmt yuv420p -shortest "${videoTempPath}"`;
+          console.log("Comando FFmpeg para video con logo:", processVideoCommand);
           await exec(processVideoCommand);
         } else {
           // Sin logo, solo aplicamos texto si es necesario
@@ -1153,6 +1157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (textOverlay) {
             const drawTextFilter = textOverlay.replace(/^,/, '');
             const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,${drawTextFilter}" -c:v libx264 -pix_fmt yuv420p "${videoTempPath}"`;
+            console.log("Comando FFmpeg para video sin logo, con texto:", processVideoCommand);
             await exec(processVideoCommand);
           } else {
             const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720" -c:v libx264 -pix_fmt yuv420p "${videoTempPath}"`;

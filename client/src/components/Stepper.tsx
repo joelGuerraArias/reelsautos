@@ -1,4 +1,4 @@
-import { Step } from "lucide-react";
+import { ImagePlus, Music, Settings, Film } from "lucide-react";
 
 interface StepperProps {
   currentStep: number;
@@ -6,9 +6,10 @@ interface StepperProps {
 
 export default function Stepper({ currentStep }: StepperProps) {
   const steps = [
-    { icon: "upload_file", label: "Upload Photos" },
-    { icon: "text_fields", label: "Create Audio" },
-    { icon: "smart_display", label: "Generate Video" }
+    { icon: <ImagePlus size={18} />, label: "Subir Fotos" },
+    { icon: <Music size={18} />, label: "Generar Audio" },
+    { icon: <Settings size={18} />, label: "Configurar Video" },
+    { icon: <Film size={18} />, label: "Generar Video" }
   ];
 
   return (
@@ -21,7 +22,7 @@ export default function Stepper({ currentStep }: StepperProps) {
                 index <= currentStep ? 'bg-primary text-white' : 'bg-gray-300 text-gray-700'
               } flex items-center justify-center mb-2`}
             >
-              <span className="material-icons">{step.icon}</span>
+              {step.icon}
             </div>
             <span className={`text-sm font-medium ${
               index <= currentStep ? '' : 'text-gray-500'

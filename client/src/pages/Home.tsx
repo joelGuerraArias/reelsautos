@@ -8,17 +8,19 @@ import PhotoUploader from "@/components/PhotoUploader";
 import PhotoPreviewList from "@/components/PhotoPreviewList";
 import AudioGenerator from "@/components/AudioGenerator";
 import AudioPreview from "@/components/AudioPreview";
+import VideoSettings from "@/components/VideoSettings";
 import VideoGenerator from "@/components/VideoGenerator";
 import VideoPreview from "@/components/VideoPreview";
 import ErrorDisplay from "@/components/ErrorDisplay";
 import { Photo, Audio, Video, ElevenLabsVoice } from "@shared/schema";
-import { Film, Wand2 } from "lucide-react";
+import { Film, Wand2, Settings } from "lucide-react";
 
 // Step definitions
 enum Step {
   UPLOAD_PHOTOS = 0,
   CREATE_AUDIO = 1,
-  GENERATE_VIDEO = 2
+  CONFIGURE_VIDEO = 2,
+  GENERATE_VIDEO = 3
 }
 
 export default function Home() {
@@ -179,6 +181,25 @@ export default function Home() {
                 onContinue={goToNextStep}
               />
             )}
+          </div>
+        );
+        
+      case Step.CONFIGURE_VIDEO:
+        return (
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <span className="mr-2 text-primary"><Settings size={20} /></span>
+              Configurar Video
+            </h2>
+            
+            <VideoSettings 
+              projectId={projectId}
+              photos={photosQuery.data as Photo[]}
+              audio={audioQuery.data as Audio}
+              onBack={goToPreviousStep}
+              onContinue={goToNextStep}
+              uploadedVideos={uploadedVideosQuery.data as any[]}
+            />
           </div>
         );
         

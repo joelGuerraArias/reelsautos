@@ -1380,8 +1380,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         downloadFilename = `${cleanTitle}.mp4`;
       }
       
+      // Configurar headers para evitar caché
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      
+      // Descargar el archivo con el nombre adecuado
       res.download(video.filepath, downloadFilename);
     } catch (error) {
+      console.error("Error al descargar video:", error);
       res.status(500).json({ error: "Failed to download video" });
     }
   });

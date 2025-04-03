@@ -82,7 +82,9 @@ export default function VideoPreview({ video, photos, audio, onBack, onNewProjec
   }, []);
   
   const downloadVideo = () => {
-    window.location.href = `/api/videos/${video.id}/download`;
+    // Añadimos un timestamp para evitar la caché del navegador
+    const timestamp = new Date().getTime();
+    window.location.href = `/api/videos/${video.id}/download?t=${timestamp}`;
   };
   
   // Guardar la configuración actual como plantilla

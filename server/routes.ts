@@ -1355,11 +1355,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
           // Separamos el textOverlay en una variable diferente para mejorar la estructura del comando
           const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
-          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[2:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -map 1:a -c:v libx264 -preset ultrafast -crf 28 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[2:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -map 1:a -c:v libx264 -preset ultrafast -crf 30 -tune fastdecode -c:a aac -b:a 128k -pix_fmt yuv420p -shortest "${outputPath}"`;
         } else {
           // Sin logo, solo aplicamos texto si es necesario
           // Usamos scale=increase para llenar completamente el marco y crop para mantener proporciones
-          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720${textOverlay}" -c:v libx264 -preset ultrafast -crf 28 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720${textOverlay}" -c:v libx264 -preset ultrafast -crf 30 -tune fastdecode -c:a aac -b:a 128k -pix_fmt yuv420p -shortest "${outputPath}"`;
         }
         
         await exec(command);
@@ -1378,11 +1378,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Si hay logo, usamos filtergraph complejo con parámetros optimizados
               // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
               const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
-              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -c:v libx264 -preset ultrafast -crf 28 -pix_fmt yuv420p "${tempOutput}"`;
+              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -c:v libx264 -preset ultrafast -crf 30 -tune fastdecode -pix_fmt yuv420p "${tempOutput}"`;
             } else {
               // Sin logo, solo aplicamos texto si es necesario, con parámetros optimizados
               // Usamos scale=increase para llenar todo el marco
-              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720${textOverlay}" -c:v libx264 -preset ultrafast -crf 28 -pix_fmt yuv420p "${tempOutput}"`;
+              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720${textOverlay}" -c:v libx264 -preset ultrafast -crf 30 -tune fastdecode -pix_fmt yuv420p "${tempOutput}"`;
             }
             
             await exec(photoCommand);
@@ -1422,17 +1422,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Comando FFmpeg usando transiciones con configuración optimizada para velocidad
           // Usamos -preset ultrafast para acelerar la codificación
           // Reducimos la calidad del video ligeramente para mayor velocidad
-          concatCommand = `ffmpeg ${inputs} -filter_complex "${xfadeFilter}" -c:v libx264 -preset ultrafast -crf 28 -pix_fmt yuv420p "${tempVideoOutput}"`;
+          concatCommand = `ffmpeg ${inputs} -filter_complex "${xfadeFilter}" -c:v libx264 -preset ultrafast -crf 30 -tune fastdecode -pix_fmt yuv420p "${tempVideoOutput}"`;
           console.log("Aplicando transiciones:", transitionType, "con duración:", transitionDuration, "(modo rápido)");
         } else {
           // Sin transiciones, usamos concatenación simple pero con parámetros optimizados
-          concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c:v libx264 -preset ultrafast -crf 28 -pix_fmt yuv420p "${tempVideoOutput}"`;
+          concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c:v libx264 -preset ultrafast -crf 30 -tune fastdecode -pix_fmt yuv420p "${tempVideoOutput}"`;
         }
         
         await exec(concatCommand);
         
         // Add audio to the final video
-        const finalCommand = `ffmpeg -i "${tempVideoOutput}" -i "${audio.filepath}" -c:v copy -c:a aac -b:a 192k -shortest "${outputPath}"`;
+        const finalCommand = `ffmpeg -i "${tempVideoOutput}" -i "${audio.filepath}" -c:v copy -c:a aac -b:a 128k -shortest "${outputPath}"`;
         await exec(finalCommand);
         
         // Clean up temp files
@@ -1477,7 +1477,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
           const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
           // Usar comillas dobles para escapar el texto dentro del comando FFmpeg
-          const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}${textOverlay}" -c:v libx264 -preset ultrafast -crf 28 -pix_fmt yuv420p -shortest "${videoTempPath}"`;
+          const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}${textOverlay}" -c:v libx264 -preset ultrafast -crf 30 -tune fastdecode -pix_fmt yuv420p -shortest "${videoTempPath}"`;
           console.log("Comando FFmpeg para video con logo:", processVideoCommand);
           await exec(processVideoCommand);
         } else {
@@ -1485,11 +1485,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Si hay texto, necesitamos aplicarlo como un filtro drawtext separado
           if (textOverlay) {
             // Usar el textOverlay directamente, porque ya incluye la coma inicial
-            const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720${textOverlay}" -c:v libx264 -preset ultrafast -crf 28 -pix_fmt yuv420p "${videoTempPath}"`;
+            const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720${textOverlay}" -c:v libx264 -preset ultrafast -crf 30 -tune fastdecode -pix_fmt yuv420p "${videoTempPath}"`;
             console.log("Comando FFmpeg para video sin logo, con texto:", processVideoCommand);
             await exec(processVideoCommand);
           } else {
-            const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720" -c:v libx264 -preset ultrafast -crf 28 -pix_fmt yuv420p "${videoTempPath}"`;
+            const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720" -c:v libx264 -preset ultrafast -crf 30 -tune fastdecode -pix_fmt yuv420p "${videoTempPath}"`;
             await exec(processVideoCommand);
           }
 

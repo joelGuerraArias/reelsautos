@@ -1242,18 +1242,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (hasLogo) {
           // Si hay logo, usamos filtergraph complejo
           // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
-          const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
-          // Usar comillas dobles para escapar el texto dentro del comando FFmpeg
-          let filterComplex = '';
+          // Simplificar completamente el proceso, sin usar complejos filtros
+          let processVideoCommand = '';
           
-          if (drawTextFilter) {
-            filterComplex = `[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]`;
+          if (textOverlay) {
+            // Si hay texto, lo añadimos directamente en un solo filtro
+            const drawTextFilter = textOverlay.replace(/^,/, '');
+            processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[v];[1:v]scale=-1:64[logo];[v][logo]overlay=W-w-10:10,${drawTextFilter}" -c:v libx264 -pix_fmt yuv420p "${videoTempPath}"`;
           } else {
-            filterComplex = `[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[outv]`;
+            // Sin texto, solo logo
+            processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[v];[1:v]scale=-1:64[logo];[v][logo]overlay=W-w-10:10" -c:v libx264 -pix_fmt yuv420p "${videoTempPath}"`;
           }
           
-          const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -i "${logoTempPath}" -filter_complex "${filterComplex}" -map "[outv]" -c:v libx264 -pix_fmt yuv420p -shortest "${videoTempPath}"`;
-          console.log("Comando FFmpeg para video con logo:", processVideoCommand);
+          console.log("Comando FFmpeg simplificado para video con logo:", processVideoCommand);
           await exec(processVideoCommand);
         } else {
           // Sin logo, solo aplicamos texto si es necesario

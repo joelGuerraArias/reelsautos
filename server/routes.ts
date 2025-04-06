@@ -1160,42 +1160,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         await exec(command);
       } else if (photos.length > 1) {
-        // Para múltiples fotos, crear un slideshow con duración igual para cada foto
+        // Para múltiples fotos, creamos un slideshow con transiciones
+        // Usaremos un enfoque diferente para crear transiciones suaves
         
-        // Procesar cada foto individualmente
+        // Creamos un filtro complejo para todas las fotos con transiciones
+        let filterComplex = "";
+        let inputs = "";
+        let overlays = [];
+        
+        // Duración de la transición (en segundos)
+        const transitionDuration = 0.5;
+        // Duración ajustada para cada foto (descontando tiempo de transición)
+        const adjustedDuration = photoDuration - transitionDuration;
+        
+        // Procesar cada foto para preparar el filtro complejo
         for (let i = 0; i < photos.length; i++) {
-          const photo = photos[i];
-          if (photo && photo.filepath) {
-            // Crear un segmento de imagen estática con overlays
-            const tempOutput = path.join(tempDir, `temp_${i}.mp4`);
-            let photoCommand;
-            
-            if (hasLogo) {
-              // Si hay logo, usamos filtergraph complejo
-              // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
-              const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
-              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
-            } else {
-              // Sin logo, solo aplicamos texto si es necesario
-              // Usamos scale=increase para llenar todo el marco
-              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720${textOverlay}" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
-            }
-            
-            await exec(photoCommand);
-            
-            // Añadir al archivo de concatenación
-            concatContent += `file '${tempOutput}'\n`;
-          }
+          // Añadir cada entrada de imagen
+          inputs += `-loop 1 -t ${photoDuration} -i "${photos[i].filepath}" `;
+          
+          // Escalar y recortar cada imagen para que llene el marco 16:9
+          filterComplex += `[${i}:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setpts=PTS-STARTPTS+${i}*${adjustedDuration}/TB[v${i}];`;
         }
         
-        // Create concat list file
-        const concatFilePath = path.join(tempDir, 'concat_list.txt');
-        fs.writeFileSync(concatFilePath, concatContent);
+        // Si hay logo, añadimos como entrada adicional
+        if (hasLogo) {
+          inputs += `-i "${logoTempPath}" `;
+          // Escalar el logo a máximo 64px de alto
+          filterComplex += `[${photos.length}:v]scale=-1:64[logo];`;
+          overlays.push("logo");
+        }
         
-        // Create output file without audio
+        // Crear las transiciones entre las imágenes
+        for (let i = 0; i < photos.length - 1; i++) {
+          // Para cada par de imágenes consecutivas, crear una transición fade
+          filterComplex += `[v${i}][v${i+1}]xfade=transition=fade:duration=${transitionDuration}:offset=${adjustedDuration * (i+1)}[xf${i}];`;
+        }
+        
+        // Concatenar todas las transiciones
+        let lastOutput = "";
+        if (photos.length > 2) {
+          // Si hay más de 2 fotos, necesitamos encadenar las transiciones
+          for (let i = 0; i < photos.length - 2; i++) {
+            if (i === 0) {
+              filterComplex += `[xf0][xf1]xfade=transition=fade:duration=${transitionDuration}:offset=${adjustedDuration * 2}[xf01];`;
+              lastOutput = "xf01";
+            } else {
+              const prevOutput = (i === 1) ? "xf01" : `xf0${i-1}`;
+              filterComplex += `[${prevOutput}][xf${i+1}]xfade=transition=fade:duration=${transitionDuration}:offset=${adjustedDuration * (i+2)}[xf0${i}];`;
+              lastOutput = `xf0${i}`;
+            }
+          }
+        } else {
+          // Si solo hay 2 fotos, la última salida es xf0
+          lastOutput = "xf0";
+        }
+        
+        // Aplicar overlays (logo y texto)
+        let currentInput = lastOutput;
+        let currentOutput = "v_out";
+        
+        if (hasLogo) {
+          filterComplex += `[${currentInput}][logo]overlay=${logoX}:${logoY}[v_with_logo];`;
+          currentInput = "v_with_logo";
+        }
+        
+        // Aplicar texto si es necesario
+        if (textOverlay) {
+          const drawTextFilter = textOverlay.replace(/^,/, '');
+          filterComplex += `[${currentInput}]${drawTextFilter}[${currentOutput}]`;
+        } else {
+          // Si no hay texto, solo renombramos la última salida
+          filterComplex += `[${currentInput}]null[${currentOutput}]`;
+        }
+        
+        // Comando completo para crear el video con transiciones
         const tempVideoOutput = path.join(tempDir, 'temp_video_output.mp4');
-        const concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c:v libx264 -pix_fmt yuv420p "${tempVideoOutput}"`;
-        await exec(concatCommand);
+        const videoCommand = `ffmpeg ${inputs} -filter_complex "${filterComplex}" -map "[${currentOutput}]" -c:v libx264 -pix_fmt yuv420p "${tempVideoOutput}"`;
+        
+        console.log("Comando para video con transiciones:", videoCommand);
+        await exec(videoCommand);
         
         // Add audio to the final video
         const finalCommand = `ffmpeg -i "${tempVideoOutput}" -i "${audio.filepath}" -c:v copy -c:a aac -b:a 192k -shortest "${outputPath}"`;
@@ -1204,9 +1247,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Clean up temp files
         setTimeout(() => {
           try {
-            if (fs.existsSync(concatFilePath)) {
-              fs.unlinkSync(concatFilePath);
-            }
             if (fs.existsSync(tempVideoOutput)) {
               fs.unlinkSync(tempVideoOutput);
             }

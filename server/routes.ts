@@ -1193,14 +1193,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const concatFilePath = path.join(tempDir, 'concat_list.txt');
         fs.writeFileSync(concatFilePath, concatContent);
         
-        // Para crear transiciones más simples, usamos el filtro de video dissolve
-        // que es un tipo de transición más compatible
+        // Simplemente concatenamos los videos sin ninguna transición
         const tempVideoOutput = path.join(tempDir, 'temp_video_output.mp4');
         
-        // Usamos directamente el archivo de concatenación para producir el video
-        // con opciones específicas para mejorar la calidad de las transiciones
-        const concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c:v libx264 -pix_fmt yuv420p -vsync vfr -vf "tblend=all_mode=dissolve,framerate=30" "${tempVideoOutput}"`;
-        console.log("Comando para video con transiciones:", concatCommand);
+        // Usamos directamente el archivo de concatenación sin ningún efecto adicional
+        const concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c:v libx264 -pix_fmt yuv420p "${tempVideoOutput}"`;
+        console.log("Comando para video sin transiciones:", concatCommand);
         await exec(concatCommand);
         
         // Add audio to the final video
@@ -1246,7 +1244,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
           const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
           // Usar comillas dobles para escapar el texto dentro del comando FFmpeg
-          const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -c:v libx264 -pix_fmt yuv420p -shortest "${videoTempPath}"`;
+          let filterComplex = '';
+          
+          if (drawTextFilter) {
+            filterComplex = `[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]`;
+          } else {
+            filterComplex = `[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[outv]`;
+          }
+          
+          const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -i "${logoTempPath}" -filter_complex "${filterComplex}" -map "[outv]" -c:v libx264 -pix_fmt yuv420p -shortest "${videoTempPath}"`;
           console.log("Comando FFmpeg para video con logo:", processVideoCommand);
           await exec(processVideoCommand);
         } else {

@@ -410,6 +410,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to delete photo" });
     }
   });
+  
+  // Stream photo file
+  app.get("/api/photos/:id/stream", async (req, res) => {
+    try {
+      const photoId = parseInt(req.params.id);
+      const photo = await storage.getPhoto(photoId);
+      
+      if (!photo) {
+        return res.status(404).json({ error: "Photo not found" });
+      }
+      
+      // Set cache control headers to prevent caching issues
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      
+      // Stream the photo file
+      res.sendFile(photo.filepath);
+    } catch (error) {
+      console.error("Error al servir la foto:", error);
+      res.status(500).json({ error: "Failed to stream photo" });
+    }
+  });
 
   // Generate audio from text using Eleven Labs API
   app.post("/api/audios", async (req, res) => {

@@ -1193,16 +1193,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const concatFilePath = path.join(tempDir, 'concat_list.txt');
         fs.writeFileSync(concatFilePath, concatContent);
         
-        // Añadir transiciones usando xfade filter en FFmpeg
-        // Primero creamos el video sin audio para poder añadir transiciones
-        const tempBasicOutput = path.join(tempDir, 'temp_basic_output.mp4');
-        const concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c:v libx264 -pix_fmt yuv420p -vsync vfr "${tempBasicOutput}"`;
-        await exec(concatCommand);
-        
-        // Añadir transiciones con filtro xfade
+        // Para crear transiciones más simples, usamos el filtro de video dissolve
+        // que es un tipo de transición más compatible
         const tempVideoOutput = path.join(tempDir, 'temp_video_output.mp4');
-        const transitionCommand = `ffmpeg -i "${tempBasicOutput}" -filter_complex "xfade=transition=fade:duration=0.7:offset=2.5,format=yuv420p" -c:v libx264 -movflags +faststart "${tempVideoOutput}"`;
-        await exec(transitionCommand);
+        
+        // Usamos directamente el archivo de concatenación para producir el video
+        // con opciones específicas para mejorar la calidad de las transiciones
+        const concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c:v libx264 -pix_fmt yuv420p -vsync vfr -vf "tblend=all_mode=dissolve,framerate=30" "${tempVideoOutput}"`;
+        console.log("Comando para video con transiciones:", concatCommand);
+        await exec(concatCommand);
         
         // Add audio to the final video
         const finalCommand = `ffmpeg -i "${tempVideoOutput}" -i "${audio.filepath}" -c:v copy -c:a aac -b:a 192k -shortest "${outputPath}"`;

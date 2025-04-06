@@ -1161,84 +1161,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await exec(command);
       } else if (photos.length > 1) {
         // Para múltiples fotos, creamos un slideshow con transiciones
-        // Usaremos un enfoque diferente para crear transiciones suaves
+        // Volvemos a un enfoque más simple pero efectivo para las transiciones
         
-        // Creamos un filtro complejo para todas las fotos con transiciones
-        let filterComplex = "";
-        let inputs = "";
-        let overlays = [];
-        
-        // Duración de la transición (en segundos)
-        const transitionDuration = 0.5;
-        // Duración ajustada para cada foto (descontando tiempo de transición)
-        const adjustedDuration = photoDuration - transitionDuration;
-        
-        // Procesar cada foto para preparar el filtro complejo
+        // Procesar cada foto individualmente
         for (let i = 0; i < photos.length; i++) {
-          // Añadir cada entrada de imagen
-          inputs += `-loop 1 -t ${photoDuration} -i "${photos[i].filepath}" `;
-          
-          // Escalar y recortar cada imagen para que llene el marco 16:9
-          filterComplex += `[${i}:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setpts=PTS-STARTPTS+${i}*${adjustedDuration}/TB[v${i}];`;
-        }
-        
-        // Si hay logo, añadimos como entrada adicional
-        if (hasLogo) {
-          inputs += `-i "${logoTempPath}" `;
-          // Escalar el logo a máximo 64px de alto
-          filterComplex += `[${photos.length}:v]scale=-1:64[logo];`;
-          overlays.push("logo");
-        }
-        
-        // Crear las transiciones entre las imágenes
-        for (let i = 0; i < photos.length - 1; i++) {
-          // Para cada par de imágenes consecutivas, crear una transición fade
-          filterComplex += `[v${i}][v${i+1}]xfade=transition=fade:duration=${transitionDuration}:offset=${adjustedDuration * (i+1)}[xf${i}];`;
-        }
-        
-        // Concatenar todas las transiciones
-        let lastOutput = "";
-        if (photos.length > 2) {
-          // Si hay más de 2 fotos, necesitamos encadenar las transiciones
-          for (let i = 0; i < photos.length - 2; i++) {
-            if (i === 0) {
-              filterComplex += `[xf0][xf1]xfade=transition=fade:duration=${transitionDuration}:offset=${adjustedDuration * 2}[xf01];`;
-              lastOutput = "xf01";
+          const photo = photos[i];
+          if (photo && photo.filepath) {
+            // Crear un segmento de imagen estática con overlays
+            const tempOutput = path.join(tempDir, `temp_${i}.mp4`);
+            let photoCommand;
+            
+            if (hasLogo) {
+              // Si hay logo, usamos filtergraph complejo
+              // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
+              const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
+              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
             } else {
-              const prevOutput = (i === 1) ? "xf01" : `xf0${i-1}`;
-              filterComplex += `[${prevOutput}][xf${i+1}]xfade=transition=fade:duration=${transitionDuration}:offset=${adjustedDuration * (i+2)}[xf0${i}];`;
-              lastOutput = `xf0${i}`;
+              // Sin logo, solo aplicamos texto si es necesario
+              // Usamos scale=increase para llenar todo el marco
+              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720${textOverlay}" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
             }
+            
+            await exec(photoCommand);
+            
+            // Añadir al archivo de concatenación
+            concatContent += `file '${tempOutput}'\n`;
           }
-        } else {
-          // Si solo hay 2 fotos, la última salida es xf0
-          lastOutput = "xf0";
         }
         
-        // Aplicar overlays (logo y texto)
-        let currentInput = lastOutput;
-        let currentOutput = "v_out";
+        // Create concat list file
+        const concatFilePath = path.join(tempDir, 'concat_list.txt');
+        fs.writeFileSync(concatFilePath, concatContent);
         
-        if (hasLogo) {
-          filterComplex += `[${currentInput}][logo]overlay=${logoX}:${logoY}[v_with_logo];`;
-          currentInput = "v_with_logo";
-        }
+        // Añadir transiciones usando xfade filter en FFmpeg
+        // Primero creamos el video sin audio para poder añadir transiciones
+        const tempBasicOutput = path.join(tempDir, 'temp_basic_output.mp4');
+        const concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c:v libx264 -pix_fmt yuv420p -vsync vfr "${tempBasicOutput}"`;
+        await exec(concatCommand);
         
-        // Aplicar texto si es necesario
-        if (textOverlay) {
-          const drawTextFilter = textOverlay.replace(/^,/, '');
-          filterComplex += `[${currentInput}]${drawTextFilter}[${currentOutput}]`;
-        } else {
-          // Si no hay texto, solo renombramos la última salida
-          filterComplex += `[${currentInput}]null[${currentOutput}]`;
-        }
-        
-        // Comando completo para crear el video con transiciones
+        // Añadir transiciones con filtro xfade
         const tempVideoOutput = path.join(tempDir, 'temp_video_output.mp4');
-        const videoCommand = `ffmpeg ${inputs} -filter_complex "${filterComplex}" -map "[${currentOutput}]" -c:v libx264 -pix_fmt yuv420p "${tempVideoOutput}"`;
-        
-        console.log("Comando para video con transiciones:", videoCommand);
-        await exec(videoCommand);
+        const transitionCommand = `ffmpeg -i "${tempBasicOutput}" -filter_complex "xfade=transition=fade:duration=0.7:offset=2.5,format=yuv420p" -c:v libx264 -movflags +faststart "${tempVideoOutput}"`;
+        await exec(transitionCommand);
         
         // Add audio to the final video
         const finalCommand = `ffmpeg -i "${tempVideoOutput}" -i "${audio.filepath}" -c:v copy -c:a aac -b:a 192k -shortest "${outputPath}"`;

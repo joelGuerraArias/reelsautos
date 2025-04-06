@@ -370,61 +370,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const stat = fs.statSync(filePath);
           console.log(`Información del archivo: Tamaño ${stat.size} bytes, tipo MIME ${req.file.mimetype}`);
           
-          // Si es un archivo AVIF, lo convertimos automáticamente a PNG
+          // Rechazar archivos AVIF directamente
           if (req.file.mimetype === 'image/avif') {
-            console.log("Archivo AVIF detectado, convirtiendo a PNG para compatibilidad");
-            try {
-              // Crear un nuevo nombre de archivo para el PNG
-              const originalPath = req.file.path;
-              const newPath = originalPath.replace(/\.avif$/i, '.png');
-              
-              // Usar FFmpeg con preset ultrafast para convertir AVIF a PNG de forma más rápida
-              await exec(`ffmpeg -i "${originalPath}" -preset ultrafast -crf 28 "${newPath}"`);
-              console.log(`Archivo AVIF convertido exitosamente a PNG: ${newPath}`);
-              
-              // Eliminar el archivo AVIF original
-              fs.unlinkSync(originalPath);
-              
-              // Actualizar la información del archivo
-              req.file.path = newPath;
-              req.file.mimetype = 'image/png';
-              req.file.filename = req.file.filename.replace(/\.avif$/i, '.png');
-              
-              // Ahora verificamos las dimensiones de la imagen convertida
-              const { stdout } = await exec(`ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "${newPath}"`);
-              console.log(`Dimensiones detectadas del archivo convertido: ${stdout.trim()}`);
-              
-              const [width, height] = stdout.trim().split('x').map(Number);
-              
-              // Verificar relación de aspecto
-              const aspectRatio = width / height;
-              const targetRatio = 16 / 9;
-              const ratioTolerance = 0.01;
-              
-              if (Math.abs(aspectRatio - targetRatio) > ratioTolerance) {
-                fs.unlinkSync(newPath);
-                res.json({ 
-                  isValid: false, 
-                  error: `Relación de aspecto inválida después de la conversión. Se esperaba 16:9 (${targetRatio.toFixed(2)}), pero se obtuvo ${aspectRatio.toFixed(2)}` 
-                });
-              } else {
-                res.json({ 
-                  isValid: true,
-                  width,
-                  height,
-                  warning: "El archivo AVIF fue convertido automáticamente a PNG para mejor compatibilidad"
-                });
-              }
-              return;
-            } catch (conversionError) {
-              console.error("Error al convertir archivo AVIF:", conversionError);
-              fs.unlinkSync(req.file.path);
-              res.status(400).json({ 
-                isValid: false, 
-                error: "No se pudo convertir el archivo AVIF. Por favor, sube una imagen en formato JPEG, PNG o WEBP." 
-              });
-              return;
-            }
+            console.log("Archivo AVIF detectado, formato no soportado");
+            fs.unlinkSync(req.file.path);
+            res.status(400).json({ 
+              isValid: false, 
+              error: "El formato AVIF no está soportado. Por favor, sube una imagen en formato JPEG, PNG o WEBP." 
+            });
+            return;
           }
         } catch (statError) {
           console.error("Error obteniendo estadísticas del archivo:", statError);
@@ -461,32 +415,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Subiendo archivo: ${req.file.originalname}, tipo: ${req.file.mimetype}, tamaño: ${req.file.size} bytes`);
 
-      // Para archivos AVIF, convertir automáticamente a PNG usando ImageMagick
+      // Rechazar archivos AVIF directamente
       if (req.file.mimetype === 'image/avif') {
-        console.log(`Detectado archivo AVIF: ${req.file.originalname}, convirtiendo a PNG para compatibilidad`);
-        
-        try {
-          // Crear un nuevo nombre de archivo para el PNG
-          const originalPath = req.file.path;
-          const newPath = originalPath.replace(/\.avif$/i, '.png');
-          
-          // Usar FFmpeg con preset ultrafast para convertir AVIF a PNG de forma más rápida
-          await exec(`ffmpeg -i "${originalPath}" -preset ultrafast -crf 28 "${newPath}"`);
-          console.log(`Archivo AVIF convertido exitosamente a PNG: ${newPath}`);
-          
-          // Eliminar el archivo AVIF original
-          fs.unlinkSync(originalPath);
-          
-          // Actualizar la información del archivo en req.file
-          req.file.path = newPath;
-          req.file.mimetype = 'image/png';
-          req.file.filename = req.file.filename.replace(/\.avif$/i, '.png');
-        } catch (conversionError) {
-          console.error("Error al convertir archivo AVIF:", conversionError);
-          return res.status(400).json({ 
-            error: "No se pudo convertir el archivo AVIF. Por favor, sube una imagen en formato JPEG, PNG o WEBP." 
-          });
-        }
+        console.log(`Archivo AVIF detectado: ${req.file.originalname}, formato no soportado`);
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({ 
+          error: "El formato AVIF no está soportado. Por favor, sube una imagen en formato JPEG, PNG o WEBP." 
+        });
       }
 
       const photoData = {

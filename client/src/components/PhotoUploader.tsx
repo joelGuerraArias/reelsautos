@@ -32,6 +32,15 @@ export default function PhotoUploader({ projectId }: PhotoUploaderProps) {
         throw new Error(validationResult.error || "Invalid photo dimensions");
       }
       
+      // Si hay una advertencia pero la foto es válida, mostrar la advertencia como un toast
+      if (validationResult.warning) {
+        toast({
+          title: "Advertencia",
+          description: validationResult.warning,
+          variant: "default"
+        });
+      }
+      
       // Upload the validated photo
       const formData = new FormData();
       formData.append("photo", file);
@@ -126,7 +135,9 @@ export default function PhotoUploader({ projectId }: PhotoUploaderProps) {
     onDrop,
     accept: {
       'image/jpeg': ['.jpg', '.jpeg'],
-      'image/png': ['.png']
+      'image/png': ['.png'],
+      'image/webp': ['.webp'],
+      'image/avif': ['.avif']
     },
     disabled: isUploading || uploadType === 'video',
     maxSize: 5 * 1024 * 1024 // 5MB
@@ -186,7 +197,7 @@ export default function PhotoUploader({ projectId }: PhotoUploaderProps) {
               <p className="mb-2 font-semibold text-lg">
                 {isDragActive ? "Suelta las fotos aquí" : "Arrastra fotos aquí o haz clic para subir"}
               </p>
-              <p className="text-sm text-gray-600 mb-2">Formatos soportados: JPG, PNG (tamaño mínimo: 640x360px)</p>
+              <p className="text-sm text-gray-600 mb-2">Formatos soportados: JPG, PNG, WEBP, AVIF (tamaño mínimo: 640x360px)</p>
               
               {isUploading && (
                 <div className="mt-3">
@@ -218,7 +229,7 @@ export default function PhotoUploader({ projectId }: PhotoUploaderProps) {
               </li>
               <li className="flex items-start">
                 <CheckCircle className="w-4 h-4 mr-1 mt-0.5" />
-                <span>Formato JPG o PNG</span>
+                <span>Formato JPG, PNG, WEBP o AVIF</span>
               </li>
               <li className="flex items-start">
                 <CheckCircle className="w-4 h-4 mr-1 mt-0.5" />

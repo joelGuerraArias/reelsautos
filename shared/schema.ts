@@ -128,6 +128,7 @@ export interface ElevenLabsVoice {
 export interface PhotoValidationResponse {
   isValid: boolean;
   error?: string;
+  warning?: string;
 }
 
 // User Preferences schema

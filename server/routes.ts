@@ -378,8 +378,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const originalPath = req.file.path;
               const newPath = originalPath.replace(/\.avif$/i, '.png');
               
-              // Ejecutar ImageMagick para convertir AVIF a PNG
-              await exec(`convert "${originalPath}" "${newPath}"`);
+              // Usar FFmpeg con preset ultrafast para convertir AVIF a PNG de forma más rápida
+              await exec(`ffmpeg -i "${originalPath}" -preset ultrafast -crf 28 "${newPath}"`);
               console.log(`Archivo AVIF convertido exitosamente a PNG: ${newPath}`);
               
               // Eliminar el archivo AVIF original
@@ -470,8 +470,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const originalPath = req.file.path;
           const newPath = originalPath.replace(/\.avif$/i, '.png');
           
-          // Ejecutar ImageMagick para convertir AVIF a PNG
-          await exec(`convert "${originalPath}" "${newPath}"`);
+          // Usar FFmpeg con preset ultrafast para convertir AVIF a PNG de forma más rápida
+          await exec(`ffmpeg -i "${originalPath}" -preset ultrafast -crf 28 "${newPath}"`);
           console.log(`Archivo AVIF convertido exitosamente a PNG: ${newPath}`);
           
           // Eliminar el archivo AVIF original

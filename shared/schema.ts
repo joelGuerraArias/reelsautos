@@ -114,8 +114,6 @@ export const generateVideoSchema = z.object({
   audioId: z.number(),
   backgroundMusicId: z.number().optional(),
   backgroundMusicVolume: z.number().min(0).max(1).default(0.2), // Volumen de la música (0-1)
-  transitionType: z.string().optional().default("fade"), // Tipo de transición entre fotos: fade, wiperight, etc.
-  transitionDuration: z.number().min(0.1).max(2).optional().default(0.5), // Duración de la transición en segundos
   projectId: z.string().min(1),
 });
 
@@ -130,7 +128,6 @@ export interface ElevenLabsVoice {
 export interface PhotoValidationResponse {
   isValid: boolean;
   error?: string;
-  warning?: string;
 }
 
 // User Preferences schema

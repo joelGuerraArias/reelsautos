@@ -24,19 +24,7 @@ export function formatFileSize(bytes: number): string {
 
 export async function validatePhoto(file: File): Promise<PhotoValidationResponse & { width?: number, height?: number }> {
   return new Promise((resolve) => {
-    // Rechazar archivos AVIF directamente
-    if (file.type === 'image/avif') {
-      console.log('Validando archivo AVIF:', file.name);
-      
-      // Rechazamos completamente el formato AVIF
-      resolve({ 
-        isValid: false, 
-        error: "El formato AVIF no está soportado. Por favor, sube una imagen en formato JPEG, PNG o WEBP."
-      });
-      return;
-    }
-    
-    // Para todos los demás formatos de imagen, usamos el enfoque estándar
+    // Create an image element to check dimensions
     const img = new Image();
     img.onload = () => {
       // Get the dimensions
@@ -60,10 +48,7 @@ export async function validatePhoto(file: File): Promise<PhotoValidationResponse
     };
     
     img.onerror = () => {
-      resolve({ 
-        isValid: false, 
-        error: "No se pudo cargar la imagen. Verifica que el archivo sea una imagen válida."
-      });
+      resolve({ isValid: false, error: "No se pudo cargar la imagen" });
     };
     
     // Load the image from the file

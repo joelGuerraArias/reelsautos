@@ -86,7 +86,7 @@ export default function PhotoPreviewList({ photos, projectId }: PhotoPreviewList
           <div key={photo.id} className="photo-item relative group">
             <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
               <img 
-                src={`/api/images/photos/${photo.id}?t=${Date.now()}`} 
+                src={`/api/photos/${photo.id}/stream`} 
                 alt={photo.filename} 
                 className="w-full h-full object-cover"
               />

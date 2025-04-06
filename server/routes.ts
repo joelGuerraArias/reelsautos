@@ -60,24 +60,11 @@ const photoUpload = multer({
   storage: photoStorage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (req, file, cb) => {
-    // Lista de tipos MIME aceptados explícitamente
-    const acceptedTypes = [
-      "image/jpeg", 
-      "image/png", 
-      "image/gif", 
-      "image/webp",
-      "image/avif" // Explícitamente aceptamos AVIF
-    ];
-    
-    console.log(`Tipo de archivo recibido: ${file.mimetype}`);
-    
-    // Aceptar los tipos de la lista o cualquier imagen
-    if (acceptedTypes.includes(file.mimetype) || file.mimetype.startsWith("image/")) {
-      console.log(`Archivo aceptado: ${file.originalname} (${file.mimetype})`);
+    // Accept only images
+    if (file.mimetype.startsWith("image/")) {
       cb(null, true);
     } else {
-      console.log(`Archivo rechazado: ${file.originalname} (${file.mimetype})`);
-      cb(new Error("Solo se permiten archivos de imagen (JPEG, PNG, GIF, WEBP, AVIF)"));
+      cb(new Error("Only image files are allowed"));
       return;
     }
   },
@@ -98,24 +85,11 @@ const logoUpload = multer({
   storage: logoStorage,
   limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
   fileFilter: (req, file, cb) => {
-    // Lista de tipos MIME aceptados explícitamente
-    const acceptedTypes = [
-      "image/jpeg", 
-      "image/png", 
-      "image/gif", 
-      "image/webp",
-      "image/avif" // Explícitamente aceptamos AVIF
-    ];
-    
-    console.log(`Tipo de archivo de logo recibido: ${file.mimetype}`);
-    
-    // Aceptar los tipos de la lista o cualquier imagen
-    if (acceptedTypes.includes(file.mimetype) || file.mimetype.startsWith("image/")) {
-      console.log(`Logo aceptado: ${file.originalname} (${file.mimetype})`);
+    // Accept only images
+    if (file.mimetype.startsWith("image/")) {
       cb(null, true);
     } else {
-      console.log(`Logo rechazado: ${file.originalname} (${file.mimetype})`);
-      cb(new Error("Solo se permiten archivos de imagen (JPEG, PNG, GIF, WEBP, AVIF)"));
+      cb(new Error("Solo se permiten archivos de imagen"));
       return;
     }
   },
@@ -331,78 +305,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ isValid: false, error: "No file uploaded" });
       }
 
-      // Registro para depuración
-      console.log(`Validando archivo: ${req.file.originalname}, tipo: ${req.file.mimetype}, tamaño: ${req.file.size} bytes`);
-
       // Use FFmpeg to check image dimensions
       const filePath = req.file.path;
-      try {
-        const { stdout } = await exec(`ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "${filePath}"`);
-        
-        console.log(`Dimensiones detectadas: ${stdout.trim()}`);
-        
-        const [width, height] = stdout.trim().split('x').map(Number);
-        let response: PhotoValidationResponse = { isValid: true };
+      const { stdout } = await exec(`ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "${filePath}"`);
       
-        // Check if dimensions match 16:9 aspect ratio
-        const aspectRatio = width / height;
-        const targetRatio = 16 / 9;
-        const ratioTolerance = 0.01; // Allow small deviation from exact ratio
-        
-        if (Math.abs(aspectRatio - targetRatio) > ratioTolerance) {
-          response = { 
-            isValid: false, 
-            error: `Relación de aspecto inválida. Se esperaba 16:9 (${targetRatio.toFixed(2)}), pero se obtuvo ${aspectRatio.toFixed(2)}` 
-          };
-        }
-        
-        // Clean up the file if it's invalid
-        if (!response.isValid) {
-          fs.unlinkSync(filePath);
-        }
-        
-        res.json(response);
-      } catch (ffprobeError) {
-        console.error("Error al ejecutar ffprobe:", ffprobeError);
-        
-        // Intenta obtener información básica del archivo sin usar ffprobe
-        try {
-          const stat = fs.statSync(filePath);
-          console.log(`Información del archivo: Tamaño ${stat.size} bytes, tipo MIME ${req.file.mimetype}`);
-          
-          // Rechazar archivos AVIF directamente
-          if (req.file.mimetype === 'image/avif') {
-            console.log("Archivo AVIF detectado, formato no soportado");
-            fs.unlinkSync(req.file.path);
-            res.status(400).json({ 
-              isValid: false, 
-              error: "El formato AVIF no está soportado. Por favor, sube una imagen en formato JPEG, PNG o WEBP." 
-            });
-            return;
-          }
-        } catch (statError) {
-          console.error("Error obteniendo estadísticas del archivo:", statError);
-        }
-        
-        // Limpiar el archivo en caso de error
-        if (req.file) {
-          fs.unlinkSync(filePath);
-        }
-        
-        res.status(500).json({ 
+      const [width, height] = stdout.trim().split('x').map(Number);
+      let response: PhotoValidationResponse = { isValid: true };
+      
+      // Check if dimensions match 16:9 aspect ratio
+      const aspectRatio = width / height;
+      const targetRatio = 16 / 9;
+      const ratioTolerance = 0.01; // Allow small deviation from exact ratio
+      
+      if (Math.abs(aspectRatio - targetRatio) > ratioTolerance) {
+        response = { 
           isValid: false, 
-          error: "No se pudo validar la imagen. Si es un formato AVIF, por favor conviértala a JPEG, PNG o WEBP para mejor compatibilidad."
-        });
+          error: `Invalid aspect ratio. Expected 16:9 (${targetRatio.toFixed(2)}), got ${aspectRatio.toFixed(2)}` 
+        };
       }
-    } catch (error) {
-      console.error("Error general en la validación de imagen:", error);
       
+      // Clean up the file if it's invalid
+      if (!response.isValid) {
+        fs.unlinkSync(filePath);
+      }
+      
+      res.json(response);
+    } catch (error) {
       // Clean up the file on error
       if (req.file) {
         fs.unlinkSync(req.file.path);
       }
-      
-      res.status(500).json({ isValid: false, error: "Error al validar la imagen" });
+      res.status(500).json({ isValid: false, error: "Failed to validate photo" });
     }
   });
 
@@ -411,17 +344,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
-      }
-      
-      console.log(`Subiendo archivo: ${req.file.originalname}, tipo: ${req.file.mimetype}, tamaño: ${req.file.size} bytes`);
-
-      // Rechazar archivos AVIF directamente
-      if (req.file.mimetype === 'image/avif') {
-        console.log(`Archivo AVIF detectado: ${req.file.originalname}, formato no soportado`);
-        fs.unlinkSync(req.file.path);
-        return res.status(400).json({ 
-          error: "El formato AVIF no está soportado. Por favor, sube una imagen en formato JPEG, PNG o WEBP." 
-        });
       }
 
       const photoData = {
@@ -438,8 +360,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const photo = await storage.createPhoto(parsedData);
       res.status(201).json(photo);
     } catch (error) {
-      console.error("Error al subir la foto:", error);
-      
       // Clean up the file on error
       if (req.file) {
         fs.unlinkSync(req.file.path);
@@ -449,7 +369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const validationError = fromZodError(error);
         res.status(400).json({ error: validationError.message });
       } else {
-        res.status(500).json({ error: "No se pudo subir la foto" });
+        res.status(500).json({ error: "Failed to upload photo" });
       }
     }
   });
@@ -488,72 +408,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       res.status(500).json({ error: "Failed to delete photo" });
-    }
-  });
-  
-  // Servir una imagen (incluido soporte para AVIF)
-  app.get("/api/photos/:id/stream", async (req, res) => {
-    try {
-      const photoId = parseInt(req.params.id);
-      const photo = await storage.getPhoto(photoId);
-      
-      if (!photo) {
-        return res.status(404).json({ error: "Photo not found" });
-      }
-      
-      // Detectar el tipo MIME correcto basado en la extensión del archivo
-      const filepath = photo.filepath;
-      let contentType = 'image/jpeg'; // Por defecto
-      
-      if (filepath.endsWith('.png')) {
-        contentType = 'image/png';
-      } else if (filepath.endsWith('.gif')) {
-        contentType = 'image/gif';
-      } else if (filepath.endsWith('.webp')) {
-        contentType = 'image/webp';
-      } else if (filepath.endsWith('.avif')) {
-        contentType = 'image/avif';
-      }
-      
-      console.log(`Sirviendo imagen: ${filepath} como ${contentType}`);
-      
-      // Stream de la imagen
-      const stat = fs.statSync(filepath);
-      const fileSize = stat.size;
-      const range = req.headers.range;
-      
-      if (range) {
-        const parts = range.replace(/bytes=/, "").split("-");
-        const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-        const chunksize = (end - start) + 1;
-        const file = fs.createReadStream(filepath, { start, end });
-        
-        res.writeHead(206, {
-          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-          'Accept-Ranges': 'bytes',
-          'Content-Length': chunksize,
-          'Content-Type': contentType,
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        });
-        
-        file.pipe(res);
-      } else {
-        res.writeHead(200, {
-          'Content-Length': fileSize,
-          'Content-Type': contentType,
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        });
-        
-        fs.createReadStream(filepath).pipe(res);
-      }
-    } catch (error) {
-      console.error("Error al servir la imagen:", error);
-      res.status(500).json({ error: "Failed to stream photo" });
     }
   });
 
@@ -729,37 +583,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Logo not found" });
       }
       
-      // Detectar el tipo MIME correcto basado en la extensión del archivo
-      const filepath = logo.filepath;
-      let contentType = 'image/jpeg'; // Por defecto
-      
-      if (filepath.endsWith('.png')) {
-        contentType = 'image/png';
-      } else if (filepath.endsWith('.gif')) {
-        contentType = 'image/gif';
-      } else if (filepath.endsWith('.webp')) {
-        contentType = 'image/webp';
-      } else if (filepath.endsWith('.avif')) {
-        contentType = 'image/avif';
-      }
-      
-      console.log(`Sirviendo logo: ${filepath} como ${contentType}`);
-      
-      // Stream del logo
-      const stat = fs.statSync(filepath);
-      const fileSize = stat.size;
-      
-      res.writeHead(200, {
-        'Content-Length': fileSize,
-        'Content-Type': contentType,
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-      
-      fs.createReadStream(filepath).pipe(res);
+      res.sendFile(logo.filepath);
     } catch (error) {
-      console.error("Error al servir el logo:", error);
       res.status(500).json({ error: "Failed to get logo file" });
     }
   });
@@ -1051,56 +876,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Stream de música de fondo
-  app.get("/api/background-music/:id/stream", async (req, res) => {
-    try {
-      const musicId = parseInt(req.params.id);
-      const music = await storage.getBackgroundMusicById(musicId);
-      
-      if (!music) {
-        return res.status(404).json({ error: "Música no encontrada" });
-      }
-      
-      // Stream del archivo de audio
-      const stat = fs.statSync(music.filepath);
-      const fileSize = stat.size;
-      const range = req.headers.range;
-      
-      if (range) {
-        const parts = range.replace(/bytes=/, "").split("-");
-        const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-        const chunksize = (end - start) + 1;
-        const file = fs.createReadStream(music.filepath, { start, end });
-        
-        res.writeHead(206, {
-          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-          'Accept-Ranges': 'bytes',
-          'Content-Length': chunksize,
-          'Content-Type': 'audio/mpeg',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        });
-        
-        file.pipe(res);
-      } else {
-        res.writeHead(200, {
-          'Content-Length': fileSize,
-          'Content-Type': 'audio/mpeg',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        });
-        
-        fs.createReadStream(music.filepath).pipe(res);
-      }
-    } catch (error) {
-      console.error("Error al transmitir música de fondo:", error);
-      res.status(500).json({ error: "No se pudo transmitir la música de fondo" });
-    }
-  });
-  
   // Eliminar una música de fondo
   app.delete("/api/background-music/:id", async (req, res) => {
     try {
@@ -1136,9 +911,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         uploadedVideoId, 
         audioId, 
         backgroundMusicId, 
-        backgroundMusicVolume,
-        transitionType,
-        transitionDuration,
+        backgroundMusicVolume, 
         projectId 
       } = validatedData;
       
@@ -1355,11 +1128,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
           // Separamos el textOverlay en una variable diferente para mejorar la estructura del comando
           const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
-          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[2:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -map 1:a -c:v libx264 -preset ultrafast -crf 30 -tune fastdecode -c:a aac -b:a 128k -pix_fmt yuv420p -shortest "${outputPath}"`;
+          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[2:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
         } else {
           // Sin logo, solo aplicamos texto si es necesario
           // Usamos scale=increase para llenar completamente el marco y crop para mantener proporciones
-          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720${textOverlay}" -c:v libx264 -preset ultrafast -crf 30 -tune fastdecode -c:a aac -b:a 128k -pix_fmt yuv420p -shortest "${outputPath}"`;
+          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720${textOverlay}" -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
         }
         
         await exec(command);
@@ -1375,14 +1148,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             let photoCommand;
             
             if (hasLogo) {
-              // Si hay logo, usamos filtergraph complejo con parámetros optimizados
+              // Si hay logo, usamos filtergraph complejo
               // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
               const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
-              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -c:v libx264 -preset ultrafast -crf 30 -tune fastdecode -pix_fmt yuv420p "${tempOutput}"`;
+              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
             } else {
-              // Sin logo, solo aplicamos texto si es necesario, con parámetros optimizados
+              // Sin logo, solo aplicamos texto si es necesario
               // Usamos scale=increase para llenar todo el marco
-              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720${textOverlay}" -c:v libx264 -preset ultrafast -crf 30 -tune fastdecode -pix_fmt yuv420p "${tempOutput}"`;
+              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720${textOverlay}" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
             }
             
             await exec(photoCommand);
@@ -1398,41 +1171,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Create output file without audio
         const tempVideoOutput = path.join(tempDir, 'temp_video_output.mp4');
-        
-        // Definir el comando según si se usan transiciones o no
-        let concatCommand;
-        
-        if (transitionType && transitionDuration && photos.length > 1) {
-          // Con transiciones, usamos el filtro xfade, pero de manera optimizada
-          let xfadeFilter = '';
-          
-          // Crear cadenas de entrada
-          const inputs = photos.map((_, index) => `-i "${path.join(tempDir, `temp_${index}.mp4`)}"`).join(' ');
-          
-          // Construir el filtro xfade para cada par de videos
-          for (let i = 0; i < photos.length - 1; i++) {
-            const offset = photoDuration * (i + 1) - transitionDuration;
-            xfadeFilter += `[${i}:v][${i+1}:v]xfade=transition=${transitionType}:duration=${transitionDuration}:offset=${offset}`;
-            
-            if (i < photos.length - 2) {
-              xfadeFilter += `[v${i}];[v${i}]`;
-            }
-          }
-          
-          // Comando FFmpeg usando transiciones con configuración optimizada para velocidad
-          // Usamos -preset ultrafast para acelerar la codificación
-          // Reducimos la calidad del video ligeramente para mayor velocidad
-          concatCommand = `ffmpeg ${inputs} -filter_complex "${xfadeFilter}" -c:v libx264 -preset ultrafast -crf 30 -tune fastdecode -pix_fmt yuv420p "${tempVideoOutput}"`;
-          console.log("Aplicando transiciones:", transitionType, "con duración:", transitionDuration, "(modo rápido)");
-        } else {
-          // Sin transiciones, usamos concatenación simple pero con parámetros optimizados
-          concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c:v libx264 -preset ultrafast -crf 30 -tune fastdecode -pix_fmt yuv420p "${tempVideoOutput}"`;
-        }
-        
+        const concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c:v libx264 -pix_fmt yuv420p "${tempVideoOutput}"`;
         await exec(concatCommand);
         
         // Add audio to the final video
-        const finalCommand = `ffmpeg -i "${tempVideoOutput}" -i "${audio.filepath}" -c:v copy -c:a aac -b:a 128k -shortest "${outputPath}"`;
+        const finalCommand = `ffmpeg -i "${tempVideoOutput}" -i "${audio.filepath}" -c:v copy -c:a aac -b:a 192k -shortest "${outputPath}"`;
         await exec(finalCommand);
         
         // Clean up temp files
@@ -1477,19 +1220,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
           const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
           // Usar comillas dobles para escapar el texto dentro del comando FFmpeg
-          const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}${textOverlay}" -c:v libx264 -preset ultrafast -crf 30 -tune fastdecode -pix_fmt yuv420p -shortest "${videoTempPath}"`;
+          const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -c:v libx264 -pix_fmt yuv420p -shortest "${videoTempPath}"`;
           console.log("Comando FFmpeg para video con logo:", processVideoCommand);
           await exec(processVideoCommand);
         } else {
           // Sin logo, solo aplicamos texto si es necesario
           // Si hay texto, necesitamos aplicarlo como un filtro drawtext separado
           if (textOverlay) {
-            // Usar el textOverlay directamente, porque ya incluye la coma inicial
-            const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720${textOverlay}" -c:v libx264 -preset ultrafast -crf 30 -tune fastdecode -pix_fmt yuv420p "${videoTempPath}"`;
+            const drawTextFilter = textOverlay.replace(/^,/, '');
+            const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,${drawTextFilter}" -c:v libx264 -pix_fmt yuv420p "${videoTempPath}"`;
             console.log("Comando FFmpeg para video sin logo, con texto:", processVideoCommand);
             await exec(processVideoCommand);
           } else {
-            const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720" -c:v libx264 -preset ultrafast -crf 30 -tune fastdecode -pix_fmt yuv420p "${videoTempPath}"`;
+            const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720" -c:v libx264 -pix_fmt yuv420p "${videoTempPath}"`;
             await exec(processVideoCommand);
           }
 
@@ -2037,72 +1780,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedSettings);
     } catch (error) {
       res.status(500).json({ error: "Failed to update app settings" });
-    }
-  });
-
-  // Servir archivos de imagen con el tipo MIME apropiado
-  app.get("/api/images/:type/:id", async (req, res) => {
-    try {
-      const { type, id } = req.params;
-      let filepath = "";
-      let imageFilename = "";
-      
-      // Determinar la ruta del archivo según el tipo
-      switch (type) {
-        case "photos":
-          const photoId = parseInt(id, 10);
-          const photo = await storage.getPhoto(photoId);
-          if (!photo) {
-            return res.status(404).json({ error: "Imagen no encontrada" });
-          }
-          filepath = photo.filepath;
-          imageFilename = photo.filename;
-          break;
-          
-        case "logos":
-          const logoId = parseInt(id, 10);
-          const logo = await storage.getLogo(logoId);
-          if (!logo) {
-            return res.status(404).json({ error: "Logo no encontrado" });
-          }
-          filepath = logo.filepath;
-          imageFilename = logo.filename;
-          break;
-          
-        default:
-          return res.status(400).json({ error: "Tipo de imagen inválido" });
-      }
-      
-      // Verificar que el archivo existe
-      if (!fs.existsSync(filepath)) {
-        return res.status(404).json({ error: "Archivo no encontrado" });
-      }
-      
-      // Determinar el tipo MIME según la extensión
-      let contentType = "image/jpeg"; // Valor predeterminado
-      
-      if (imageFilename.toLowerCase().endsWith(".png")) {
-        contentType = "image/png";
-      } else if (imageFilename.toLowerCase().endsWith(".gif")) {
-        contentType = "image/gif";
-      } else if (imageFilename.toLowerCase().endsWith(".webp")) {
-        contentType = "image/webp";
-      } else if (imageFilename.toLowerCase().endsWith(".avif")) {
-        contentType = "image/avif";
-      } else if (imageFilename.toLowerCase().endsWith(".svg")) {
-        contentType = "image/svg+xml";
-      }
-      
-      // Establecer cache-control para optimizar rendimiento
-      res.setHeader('Cache-Control', 'public, max-age=43200'); // 12 horas
-      res.setHeader('Content-Type', contentType);
-      
-      // Enviar el archivo
-      const fileStream = fs.createReadStream(filepath);
-      fileStream.pipe(res);
-    } catch (error) {
-      console.error("Error al servir imagen:", error);
-      res.status(500).json({ error: "Error al procesar la imagen" });
     }
   });
 

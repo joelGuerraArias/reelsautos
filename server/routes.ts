@@ -1201,7 +1201,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         uploadedVideoId, 
         audioId, 
         backgroundMusicId, 
-        backgroundMusicVolume, 
+        backgroundMusicVolume,
+        transitionType,
+        transitionDuration,
         projectId 
       } = validatedData;
       
@@ -1461,7 +1463,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Create output file without audio
         const tempVideoOutput = path.join(tempDir, 'temp_video_output.mp4');
-        const concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c:v libx264 -pix_fmt yuv420p "${tempVideoOutput}"`;
+        
+        // Definir el comando según si se usan transiciones o no
+        let concatCommand;
+        
+        if (transitionType && transitionDuration && photos.length > 1) {
+          // Con transiciones, usamos el filtro xfade
+          let xfadeFilter = '';
+          
+          // Crear cadenas de entrada
+          const inputs = photos.map((_, index) => `-i "${path.join(tempDir, `temp_${index}.mp4`)}"`).join(' ');
+          
+          // Construir el filtro xfade para cada par de videos
+          for (let i = 0; i < photos.length - 1; i++) {
+            const offset = photoDuration * (i + 1) - transitionDuration;
+            xfadeFilter += `[${i}:v][${i+1}:v]xfade=transition=${transitionType}:duration=${transitionDuration}:offset=${offset}`;
+            
+            if (i < photos.length - 2) {
+              xfadeFilter += `[v${i}];[v${i}]`;
+            }
+          }
+          
+          // Comando FFmpeg usando transiciones
+          concatCommand = `ffmpeg ${inputs} -filter_complex "${xfadeFilter}" -c:v libx264 -pix_fmt yuv420p "${tempVideoOutput}"`;
+          console.log("Aplicando transiciones:", transitionType, "con duración:", transitionDuration);
+        } else {
+          // Sin transiciones, usamos concatenación simple
+          concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c:v libx264 -pix_fmt yuv420p "${tempVideoOutput}"`;
+        }
+        
         await exec(concatCommand);
         
         // Add audio to the final video

@@ -5,7 +5,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Photo, Audio, AppSettings, Logo, BackgroundMusic, UploadedVideo } from "@shared/schema";
 import { 
   Film, 
-  Wand2, 
+  Wand2,
+  Wand,
   Music, 
   Settings, 
   X, 
@@ -63,6 +64,11 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
   const [musicFile, setMusicFile] = useState<File | null>(null);
   const [musicName, setMusicName] = useState<string>("");
   
+  // Estado para las transiciones entre fotos
+  const [useTransitions, setUseTransitions] = useState<boolean>(true);
+  const [transitionType, setTransitionType] = useState<string>("fade");
+  const [transitionDuration, setTransitionDuration] = useState<number>(0.5);
+  
   // Referencias a los inputs de archivos
   const videoInputRef = useRef<HTMLInputElement>(null);
   const musicInputRef = useRef<HTMLInputElement>(null);
@@ -116,6 +122,25 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
       setSelectedLogoId(firstLogo.id);
     }
   }, [logosQuery.data, selectedLogoId]);
+  
+  // Efecto para cargar valores guardados de transiciones
+  useEffect(() => {
+    const savedTransitionType = localStorage.getItem('transitionType');
+    const savedTransitionDuration = localStorage.getItem('transitionDuration');
+    const savedUseTransitions = localStorage.getItem('useTransitions');
+    
+    if (savedTransitionType) {
+      setTransitionType(savedTransitionType);
+    }
+    
+    if (savedTransitionDuration) {
+      setTransitionDuration(parseFloat(savedTransitionDuration));
+    }
+    
+    if (savedUseTransitions) {
+      setUseTransitions(savedUseTransitions === 'true');
+    }
+  }, []);
   
   // Actualizar configuración
   const updateSettingsMutation = useMutation({
@@ -235,6 +260,12 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
         payload.uploadedVideoId = uploadedVideo.id;
       } else {
         payload.photoIds = photos.map(photo => photo.id.toString());
+        
+        // Si hay más de una foto, agregar parámetros de transición
+        if (photos.length > 1 && useTransitions) {
+          payload.transitionType = transitionType;
+          payload.transitionDuration = transitionDuration;
+        }
       }
       
       // Agregar música de fondo si está habilitada
@@ -821,6 +852,76 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
             </div>
           )}
         </div>
+        
+        {/* Configuración de transiciones */}
+        {!useUploadedVideo && photos.length > 1 && (
+          <div className="mb-6 border-t-2 border-b-2 border-blue-100 py-4 mt-8">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xl font-bold flex items-center text-blue-700">
+                <Wand className="mr-2" size={20} />
+                Transiciones
+              </h3>
+              <div className="flex items-center">
+                <input 
+                  type="checkbox" 
+                  id="use-transitions" 
+                  checked={useTransitions} 
+                  onChange={(e) => setUseTransitions(e.target.checked)}
+                  className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="use-transitions" className="ml-2 text-sm font-medium text-gray-700">
+                  Activar transiciones
+                </label>
+              </div>
+            </div>
+            
+            {useTransitions && (
+              <div className="mt-3 p-4 bg-gray-50 rounded-md">
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tipo de transición
+                  </label>
+                  <select
+                    value={transitionType}
+                    onChange={(e) => setTransitionType(e.target.value)}
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                  >
+                    <option value="fade">Fundido</option>
+                    <option value="wipeleft">Barrido izquierda</option>
+                    <option value="wiperight">Barrido derecha</option>
+                    <option value="wipeup">Barrido arriba</option>
+                    <option value="wipedown">Barrido abajo</option>
+                    <option value="slideleft">Deslizar izquierda</option>
+                    <option value="slideright">Deslizar derecha</option>
+                    <option value="fadeblack">Fundido negro</option>
+                    <option value="fadewhite">Fundido blanco</option>
+                    <option value="circlecrop">Círculo</option>
+                    <option value="circleclose">Cerrar círculo</option>
+                    <option value="circleopen">Abrir círculo</option>
+                    <option value="hblur">Desenfoque horizontal</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Duración de la transición: {transitionDuration.toFixed(1)} segundos
+                  </label>
+                  <div className="flex items-center">
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="2"
+                      step="0.1"
+                      value={transitionDuration}
+                      onChange={(e) => setTransitionDuration(parseFloat(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         
         {/* Configuración de Título */}
         <div className="mb-6">

@@ -56,6 +56,11 @@ export default function VideoSettings({
   const [musicFile, setMusicFile] = useState<File | null>(null);
   const [musicName, setMusicName] = useState<string>("");
   
+  // Estado para las transiciones entre fotos
+  const [useTransitions, setUseTransitions] = useState<boolean>(true);
+  const [transitionType, setTransitionType] = useState<string>("fade");
+  const [transitionDuration, setTransitionDuration] = useState<number>(0.5);
+  
   // Referencias a los inputs de archivos
   const videoInputRef = useRef<HTMLInputElement>(null);
   const musicInputRef = useRef<HTMLInputElement>(null);
@@ -110,6 +115,25 @@ export default function VideoSettings({
       setUploadedVideo(latestVideo);
     }
   }, [uploadedVideosQuery.data]);
+  
+  // Efecto para cargar valores guardados de transiciones
+  useEffect(() => {
+    const savedTransitionType = localStorage.getItem('transitionType');
+    const savedTransitionDuration = localStorage.getItem('transitionDuration');
+    const savedUseTransitions = localStorage.getItem('useTransitions');
+    
+    if (savedTransitionType) {
+      setTransitionType(savedTransitionType);
+    }
+    
+    if (savedTransitionDuration) {
+      setTransitionDuration(parseFloat(savedTransitionDuration));
+    }
+    
+    if (savedUseTransitions) {
+      setUseTransitions(savedUseTransitions === 'true');
+    }
+  }, []);
   
   // Mutación para actualizar la configuración de la aplicación
   const updateSettingsMutation = useMutation({
@@ -319,9 +343,57 @@ export default function VideoSettings({
     "#00ffff"   // cian
   ];
   
+  // Transiciones disponibles
+  const transitions = [
+    { id: "fade", name: "Fundido", description: "Transición suave entre imágenes" },
+    { id: "wipeleft", name: "Barrido izquierda", description: "Barrido de derecha a izquierda" },
+    { id: "wiperight", name: "Barrido derecha", description: "Barrido de izquierda a derecha" },
+    { id: "wipeup", name: "Barrido arriba", description: "Barrido de abajo hacia arriba" },
+    { id: "wipedown", name: "Barrido abajo", description: "Barrido de arriba hacia abajo" },
+    { id: "slideleft", name: "Deslizar izquierda", description: "Deslizamiento hacia la izquierda" },
+    { id: "slideright", name: "Deslizar derecha", description: "Deslizamiento hacia la derecha" },
+    { id: "fadeblack", name: "Fundido negro", description: "Fundido a negro entre imágenes" },
+    { id: "fadewhite", name: "Fundido blanco", description: "Fundido a blanco entre imágenes" },
+    { id: "circlecrop", name: "Círculo", description: "Transición en forma de círculo" },
+    { id: "circleclose", name: "Cerrar círculo", description: "Cierre en forma de círculo" },
+    { id: "circleopen", name: "Abrir círculo", description: "Apertura en forma de círculo" },
+    { id: "hblur", name: "Desenfoque horizontal", description: "Desenfoque horizontal" }
+  ];
+  
+  // Función para generar el video
+  const generateVideoMutation = useMutation({
+    mutationFn: async (data: {
+      photoIds?: string[];
+      uploadedVideoId?: number;
+      audioId: number;
+      backgroundMusicId?: number;
+      backgroundMusicVolume?: number;
+      transitionType?: string;
+      transitionDuration?: number;
+      projectId: string;
+    }) => {
+      return apiRequest("POST", "/api/videos", data);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error al generar el video",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+  
   // Guardar la configuración y continuar
   const handleContinue = async () => {
     await saveSettings();
+    
+    // Almacenar los parámetros de transición como preferencias del usuario
+    if (!useUploadedVideo && photos.length > 1) {
+      localStorage.setItem('transitionType', transitionType);
+      localStorage.setItem('transitionDuration', transitionDuration.toString());
+      localStorage.setItem('useTransitions', useTransitions.toString());
+    }
+    
     onContinue();
   };
 
@@ -635,6 +707,73 @@ export default function VideoSettings({
             </div>
           )}
         </div>
+        
+        {/* Transiciones entre fotos */}
+        {!useUploadedVideo && photos.length > 1 && (
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-2 flex items-center">
+              <Settings className="mr-2" size={18} />
+              Transiciones entre Fotos
+            </h3>
+            
+            <div className="flex items-center mb-3">
+              <input
+                type="checkbox"
+                id="useTransitions"
+                checked={useTransitions}
+                onChange={(e) => setUseTransitions(e.target.checked)}
+                className="mr-2 h-4 w-4"
+              />
+              <label htmlFor="useTransitions" className="text-sm font-medium">
+                Agregar transiciones entre fotos
+              </label>
+            </div>
+            
+            {useTransitions && (
+              <div className="border border-gray-200 rounded-lg p-3">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Tipo de transición:</label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {transitions.slice(0, 9).map((transition) => (
+                      <button
+                        key={transition.id}
+                        className={`text-left p-2 rounded-md flex items-center ${
+                          transitionType === transition.id 
+                            ? 'bg-blue-50 border border-blue-200' 
+                            : 'border border-gray-200 hover:bg-gray-50'
+                        }`}
+                        onClick={() => setTransitionType(transition.id)}
+                      >
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">{transition.name}</div>
+                          <div className="text-xs text-gray-500">{transition.description}</div>
+                        </div>
+                        {transitionType === transition.id && (
+                          <Check className="w-4 h-4 text-blue-500" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="mt-3">
+                  <label className="flex items-center text-sm font-medium mb-1">
+                    Duración de transición: {transitionDuration.toFixed(1)} segundos
+                  </label>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="2.0"
+                    step="0.1"
+                    value={transitionDuration}
+                    onChange={(e) => setTransitionDuration(parseFloat(e.target.value))}
+                    className="w-full accent-blue-500"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         
         {/* Selección de Logo */}
         <div className="mb-6">

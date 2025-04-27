@@ -607,14 +607,21 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
                 </div>
               ) : uploadedVideosQuery.data && Array.isArray(uploadedVideosQuery.data) && uploadedVideosQuery.data.length > 0 ? (
                 <div className="space-y-3">
-                  <p className="text-sm text-gray-600 mb-2">Selecciona un video subido previamente:</p>
+                  <p className="text-sm text-gray-600 mb-2">Selecciona los videos que quieres incluir:</p>
                   {uploadedVideosQuery.data && Array.isArray(uploadedVideosQuery.data) && (uploadedVideosQuery.data as UploadedVideo[]).map((video: UploadedVideo) => (
                     <button
                       key={video.id}
                       className={`p-2 border rounded-md w-full text-left flex justify-between items-center ${
-                        uploadedVideo && uploadedVideo.id === video.id ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                        selectedVideoIds.includes(video.id) ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
                       }`}
-                      onClick={() => setUploadedVideo(video)}
+                      onClick={() => {
+                        // Toggle video selection
+                        if (selectedVideoIds.includes(video.id)) {
+                          setSelectedVideoIds(selectedVideoIds.filter(id => id !== video.id));
+                        } else {
+                          setSelectedVideoIds([...selectedVideoIds, video.id]);
+                        }
+                      }}
                     >
                       <div className="flex items-center">
                         <Video className="mr-2 text-blue-500" size={16} />
@@ -625,7 +632,7 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
                           </p>
                         </div>
                       </div>
-                      {uploadedVideo && uploadedVideo.id === video.id && (
+                      {selectedVideoIds.includes(video.id) && (
                         <Check className="text-blue-500" size={18} />
                       )}
                     </button>

@@ -12,8 +12,12 @@ import VideoSettings from "@/components/VideoSettings";
 import VideoGenerator from "@/components/VideoGenerator";
 import VideoPreview from "@/components/VideoPreview";
 import ErrorDisplay from "@/components/ErrorDisplay";
-import { Photo, Audio, Video, ElevenLabsVoice } from "@shared/schema";
-import { Film, Wand2, Settings } from "lucide-react";
+import SaveProjectDialog from "@/components/SaveProjectDialog";
+import ProjectsList from "@/components/ProjectsList";
+import { Photo, Audio, Video, ElevenLabsVoice, Project } from "@shared/schema";
+import { Film, Wand2, Settings, Save, FolderOpen, FilePlus } from "lucide-react";
+import { Dialog, DialogTrigger, DialogContent } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 // Step definitions
 enum Step {
@@ -75,21 +79,25 @@ export default function Home() {
       
       // Si hay una plantilla y queremos usarla, copiar sus configuraciones
       if (useTemplate && templateQuery.data) {
-        const template = templateQuery.data;
+        const template = templateQuery.data as Project;
         
         // Copiar configuraciones relevantes de la plantilla al nuevo proyecto
-        Object.assign(newProject, {
+        const projectWithConfig = {
+          ...newProject,
           selectedVoiceId: template.selectedVoiceId,
           selectedLogoId: template.selectedLogoId,
           logoPosition: template.logoPosition,
           showTitle: template.showTitle,
+          titleText: template.titleText,
           titleFontSize: template.titleFontSize,
           titleColor: template.titleColor,
           titlePosition: template.titlePosition,
           backgroundMusicId: template.backgroundMusicId,
           backgroundMusicVolume: template.backgroundMusicVolume,
           useUploadedVideo: template.useUploadedVideo
-        });
+        };
+        
+        Object.assign(newProject, projectWithConfig);
       }
       
       return apiRequest('POST', '/api/projects', newProject);
@@ -289,6 +297,53 @@ export default function Home() {
     }
   };
 
+  // States for dialogs
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+  const [isProjectsListOpen, setIsProjectsListOpen] = useState(false);
+  const [projectTitle, setProjectTitle] = useState<string | undefined>(undefined);
+  
+  // Handler for saving a project
+  const handleSaveProject = (savedProjectId: string) => {
+    toast({
+      title: "Proyecto guardado",
+      description: "El proyecto se ha guardado correctamente"
+    });
+    setIsSaveDialogOpen(false);
+    
+    // Actualizar la información del proyecto para reflejar el título
+    queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
+  };
+  
+  // Handler for selecting a project from the list
+  const handleSelectProject = (selectedProjectId: string) => {
+    if (selectedProjectId === projectId) {
+      setIsProjectsListOpen(false);
+      return;
+    }
+    
+    setProjectId(selectedProjectId);
+    setIsProjectsListOpen(false);
+    
+    // Invalidate queries to refresh data
+    queryClient.invalidateQueries();
+    
+    // Start at the first step
+    setCurrentStep(Step.UPLOAD_PHOTOS);
+    
+    toast({
+      title: "Proyecto cargado",
+      description: "El proyecto se ha cargado correctamente"
+    });
+  };
+  
+  // Get project title for display
+  useEffect(() => {
+    if (projectQuery.data) {
+      const project = projectQuery.data as Project;
+      setProjectTitle(project.title);
+    }
+  }, [projectQuery.data]);
+
   return (
     <div className="bg-gray-50 text-gray-800 font-sans min-h-screen">
       <div className="container mx-auto px-4 py-8 max-w-5xl">
@@ -300,10 +355,67 @@ export default function Home() {
                 <span className="text-primary">Foto</span><span className="text-accent">To</span><span className="text-secondary">Video</span>
                 <Film className="ml-2 text-accent" />
               </h1>
-              <p className="text-gray-600 mt-1">Create videos from your photos and text</p>
+              <p className="text-gray-600 mt-1">Crea videos a partir de tus fotos y texto</p>
+            </div>
+            
+            <div className="flex items-center space-x-3 mt-4 md:mt-0">
+              <div className="text-sm font-medium text-gray-600 mr-2">
+                {projectTitle || "Proyecto sin guardar"}
+              </div>
+              
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setIsSaveDialogOpen(true)}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                Guardar
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setIsProjectsListOpen(true)}
+              >
+                <FolderOpen className="mr-2 h-4 w-4" />
+                Abrir
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={startNewProject}
+              >
+                <FilePlus className="mr-2 h-4 w-4" />
+                Nuevo
+              </Button>
             </div>
           </div>
         </header>
+        
+        {/* Save Project Dialog */}
+        <SaveProjectDialog 
+          isOpen={isSaveDialogOpen}
+          onClose={() => setIsSaveDialogOpen(false)}
+          onSaved={handleSaveProject}
+          projectId={projectId}
+          currentTitle={projectTitle}
+        />
+        
+        {/* Projects List Dialog */}
+        <Dialog open={isProjectsListOpen} onOpenChange={setIsProjectsListOpen}>
+          <DialogContent className="sm:max-w-[800px]">
+            <ProjectsList 
+              onSelectProject={handleSelectProject}
+              onCreateNewProject={() => {
+                startNewProject();
+                setIsProjectsListOpen(false);
+              }}
+              onLoadTemplate={handleSelectProject}
+              currentProjectId={projectId}
+            />
+          </DialogContent>
+        </Dialog>
 
         {/* Main Content */}
         <main>

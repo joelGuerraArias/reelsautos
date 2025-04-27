@@ -75,10 +75,7 @@ export default function ProjectsList({
 
   const handleCloneTemplate = async (templateId: string) => {
     try {
-      const response = await apiRequest('/api/projects/clone-template', {
-        method: 'POST',
-        body: JSON.stringify({ templateId })
-      });
+      const response = await apiRequest('POST', '/api/projects/clone-template', { templateId });
 
       if (response.ok) {
         const newProject = await response.json();
@@ -110,9 +107,7 @@ export default function ProjectsList({
     }
 
     try {
-      const response = await apiRequest(`/api/projects/${projectId}`, {
-        method: 'DELETE'
-      });
+      const response = await apiRequest('DELETE', `/api/projects/${projectId}`);
 
       if (response.ok) {
         toast({
@@ -252,7 +247,7 @@ export default function ProjectsList({
                   <Card key={template.id} className="mb-4">
                     <CardHeader className="p-4 pb-2">
                       <CardTitle className="text-lg flex items-center">
-                        <Template className="mr-2 h-4 w-4" />
+                        <BookCopy className="mr-2 h-4 w-4" />
                         {template.title}
                       </CardTitle>
                       <CardDescription>

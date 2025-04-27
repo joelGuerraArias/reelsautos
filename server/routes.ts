@@ -1123,20 +1123,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Escapar comillas simples
           const text = titleText.replace(/'/g, "\\'"); // Escape single quotes
         
-          // Título estilo moderno: caja redondeada con texto centrado como en la imagen
-          // Usamos un estilo de texto tipo "pill" o pastilla con fondo rojo y esquinas redondeadas
+          // Título simple: texto blanco centrado sin fondo
           // Perfectamente centrado horizontal y verticalmente
           const textX = '(w-tw)/2'; // Centrado horizontal exacto
           const textY = 'h-th-150'; // Subimos la posición un 25% aproximadamente (desde 50px a 150px del borde inferior)
           
-          // Estilo moderno: texto blanco sobre fondo con color configurable y esquinas redondeadas
-          // FFmpeg drawtext no soporta directamente bordes redondeados para el fondo
-          // Usamos un padding generoso (boxborderw) para simular bordes redondeados
-          // Debemos crear una solución alternativa usando un rectángulo con bordes redondeados
-          // El color del fondo es configurable pero el texto siempre es blanco
+          // Estilo simple: texto blanco sin fondo (eliminado el fondo del texto que causaba errores)
           // Escapar las comillas simples y dobles para evitar problemas con FFmpeg
           const escapedText = text.replace(/'/g, "'\\''").replace(/"/g, '\\"');
-          textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${escapedText}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=red@0.9:boxborderw=10`;
+          textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${escapedText}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}`;
           
           console.log(`Aplicando texto con saltos de línea: "${titleText}" con tamaño ${fontSize}px`);
         }

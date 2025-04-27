@@ -37,7 +37,6 @@ export default function VideoSettings({
   const [titleText, setTitleText] = useState<string>("");
   const [titleFontSize, setTitleFontSize] = useState<number>(24);
   const [titleColor, setTitleColor] = useState<string>("#ffffff");
-  const [titleBackgroundColor, setTitleBackgroundColor] = useState<string>("red");
   const [titlePosition, setTitlePosition] = useState<string>("bottom-center");
   const [uploadingLogo, setUploadingLogo] = useState<boolean>(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);

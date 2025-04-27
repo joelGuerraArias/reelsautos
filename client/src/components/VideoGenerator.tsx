@@ -44,6 +44,7 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
   const [titleText, setTitleText] = useState<string>("");
   const [titleFontSize, setTitleFontSize] = useState<number>(32);
   const [titleColor, setTitleColor] = useState<string>("#ffffff");
+  const [titleBackgroundColor, setTitleBackgroundColor] = useState<string>("red");
   const [titlePosition, setTitlePosition] = useState<string>("bottom-center");
   const [uploadingLogo, setUploadingLogo] = useState<boolean>(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -105,6 +106,7 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
       setTitleText(settings.titleText ?? "");
       setTitleFontSize(settings.titleFontSize ?? 32);
       setTitleColor(settings.titleColor ?? "#ffffff");
+      setTitleBackgroundColor(settings.titleBackgroundColor ?? "red");
       setTitlePosition(settings.titlePosition ?? "bottom-center");
     }
   }, [settingsQuery.data]);
@@ -147,6 +149,7 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
       titleText,
       titleFontSize,
       titleColor,
+      titleBackgroundColor,
       titlePosition,
       updatedAt: new Date().toISOString()
     });

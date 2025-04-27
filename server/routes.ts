@@ -1156,73 +1156,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await exec(command);
       } else if (photos.length > 1) {
         // Para múltiples fotos, crear un slideshow con duración igual para cada foto
+        // Optimización: usar un filtergraph complejo en lugar de procesar cada foto por separado
         
-        // Procesar cada foto individualmente
+        // Preparar filtros para cada foto
+        const filterComplex = [];
+        const photoFilters = [];
+        
+        // Preparar inputs para FFmpeg
+        let inputArgs = '';
+        
         for (let i = 0; i < photos.length; i++) {
           const photo = photos[i];
           if (photo && photo.filepath) {
-            // Crear un segmento de imagen estática con overlays
-            const tempOutput = path.join(tempDir, `temp_${i}.mp4`);
-            let photoCommand;
+            // Añadir input de foto
+            inputArgs += ` -loop 1 -t ${photoDuration} -i "${photo.filepath}"`;
             
-            if (hasLogo) {
-              // Si hay logo, usamos filtergraph complejo
-              // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
-              const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
-              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
-            } else {
-              // Sin logo, solo aplicamos texto si es necesario
-              // Usamos scale=increase para llenar todo el marco
-              photoCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720${textOverlay}" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
-            }
+            // Escalar y recortar la imagen a 1280x720
+            filterComplex.push(`[${i}:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[v${i}]`);
             
-            await exec(photoCommand);
-            
-            // Añadir al archivo de concatenación
-            concatContent += `file '${tempOutput}'\n`;
+            // Añadir al array de "named" streams
+            photoFilters.push(`[v${i}]`);
           }
         }
         
-        // Create concat list file
-        const concatFilePath = path.join(tempDir, 'concat_list.txt');
-        fs.writeFileSync(concatFilePath, concatContent);
+        // Si hay logo, añadir como input
+        if (hasLogo) {
+          inputArgs += ` -i "${logoTempPath}"`;
+          const logoIdx = photos.length;
+          filterComplex.push(`[${logoIdx}:v]scale=-1:64[logo]`);
+        }
         
-        // Create output file without audio
-        const tempVideoOutput = path.join(tempDir, 'temp_video_output.mp4');
-        const concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c:v libx264 -pix_fmt yuv420p "${tempVideoOutput}"`;
-        await exec(concatCommand);
+        // Concatenar las fotos escaladas
+        const photoChain = photoFilters.join('');
+        filterComplex.push(`${photoChain}concat=n=${photoFilters.length}:v=1:a=0[vbase]`);
         
-        // Add audio to the final video
-        const finalCommand = `ffmpeg -i "${tempVideoOutput}" -i "${audio.filepath}" -c:v copy -c:a aac -b:a 192k -shortest "${outputPath}"`;
-        await exec(finalCommand);
+        // Aplicar logo y texto si es necesario
+        if (hasLogo) {
+          if (textOverlay) {
+            const drawTextFilter = textOverlay.replace(/^,/, '');
+            filterComplex.push(`[vbase][logo]overlay=${logoX}:${logoY}[withlogo];[withlogo]${drawTextFilter}[outv]`);
+          } else {
+            filterComplex.push(`[vbase][logo]overlay=${logoX}:${logoY}[outv]`);
+          }
+        } else if (textOverlay) {
+          const drawTextFilter = textOverlay.replace(/^,/, '');
+          filterComplex.push(`[vbase]${drawTextFilter}[outv]`);
+        } else {
+          filterComplex.push(`[vbase]copy[outv]`);
+        }
         
-        // Clean up temp files
+        // Construir el comando FFmpeg optimizado
+        const allFilters = filterComplex.join(';');
+        let command = `ffmpeg${inputArgs} -i "${audio.filepath}" -filter_complex "${allFilters}" -map "[outv]" -map ${photos.length + (hasLogo ? 1 : 0)}:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+        
+        console.log("Comando FFmpeg optimizado:", command);
+        await exec(command);
+        
+        // Clean up any temp files
         setTimeout(() => {
           try {
-            if (fs.existsSync(concatFilePath)) {
-              fs.unlinkSync(concatFilePath);
-            }
-            if (fs.existsSync(tempVideoOutput)) {
-              fs.unlinkSync(tempVideoOutput);
-            }
-            for (let i = 0; i < photos.length; i++) {
-              const tempOutput = path.join(tempDir, `temp_${i}.mp4`);
-              if (fs.existsSync(tempOutput)) {
-                fs.unlinkSync(tempOutput);
-              }
-            }
             // Clean up logo temp file if it exists
-            if (fs.existsSync(logoTempPath)) {
+            if (hasLogo && fs.existsSync(logoTempPath)) {
               fs.unlinkSync(logoTempPath);
             }
-            // Try to remove temp directory
+            // Try to remove temp directory if it's empty
             if (fs.existsSync(tempDir)) {
-              fs.rmdirSync(tempDir);
+              const files = fs.readdirSync(tempDir);
+              if (files.length === 0) {
+                fs.rmdirSync(tempDir);
+              }
             }
           } catch (e) {
             console.warn("Error cleaning up temp files:", e);
           }
-        }, 5000);
+        }, 2000);
       } else if (uploadedVideo && uploadedVideo.filepath) {
         // Procesar usando un video subido
         console.log("Procesando con video subido:", uploadedVideo.filename);

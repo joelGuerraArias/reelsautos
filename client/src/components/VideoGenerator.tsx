@@ -31,9 +31,10 @@ interface VideoGeneratorProps {
   audio: Audio;
   onBack: () => void;
   uploadedVideos?: UploadedVideo[];
+  selectedVideoIds?: number[];
 }
 
-export default function VideoGenerator({ projectId, photos, audio, onBack, uploadedVideos }: VideoGeneratorProps) {
+export default function VideoGenerator({ projectId, photos, audio, onBack, uploadedVideos, selectedVideoIds: initialSelectedVideoIds }: VideoGeneratorProps) {
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
   
@@ -52,9 +53,16 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
   // Estado para la funcionalidad de video subido
   const [useUploadedVideo, setUseUploadedVideo] = useState<boolean>(false);
   const [uploadedVideo, setUploadedVideo] = useState<UploadedVideo | null>(null);
-  const [selectedVideoIds, setSelectedVideoIds] = useState<number[]>([]);
+  const [selectedVideoIds, setSelectedVideoIds] = useState<number[]>(initialSelectedVideoIds || []);
   const [uploadingVideo, setUploadingVideo] = useState<boolean>(false);
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  
+  // Si hay videos seleccionados, activar el modo de video subido
+  useEffect(() => {
+    if (selectedVideoIds && selectedVideoIds.length > 0) {
+      setUseUploadedVideo(true);
+    }
+  }, [selectedVideoIds]);
   
   // Estado para la música de fondo
   const [useBackgroundMusic, setUseBackgroundMusic] = useState<boolean>(false);

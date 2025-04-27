@@ -99,7 +99,6 @@ export default function VideoSettings({
       setTitleText(settings.titleText ?? "");
       setTitleFontSize(settings.titleFontSize ?? 24);
       setTitleColor(settings.titleColor ?? "#ffffff");
-      setTitleBackgroundColor(settings.titleBackgroundColor ?? "red");
       setTitlePosition(settings.titlePosition ?? "bottom-center");
     }
   }, [settingsQuery.data]);
@@ -139,7 +138,6 @@ export default function VideoSettings({
       titleText,
       titleFontSize,
       titleColor,
-      titleBackgroundColor,
       titlePosition,
       updatedAt: new Date().toISOString()
     });
@@ -858,34 +856,6 @@ export default function VideoSettings({
                       title={color}
                     >
                       {titleColor === color && (
-                        <Check 
-                          size={16} 
-                          className={`mx-auto ${
-                            ['#ffffff', '#00ff00', '#ffff00', '#00ffff'].includes(color) 
-                              ? 'text-black' 
-                              : 'text-white'
-                          }`} 
-                        />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="mb-3">
-                <p className="text-sm font-medium mb-2">Color de fondo del texto:</p>
-                <div className="grid grid-cols-8 gap-2">
-                  {colors.map((color) => (
-                    <button
-                      key={color}
-                      className={`w-full h-8 rounded-md border-2 ${
-                        titleBackgroundColor === color ? 'border-blue-500' : 'border-gray-300'
-                      }`}
-                      style={{ backgroundColor: color }}
-                      onClick={() => setTitleBackgroundColor(color)}
-                      title={color}
-                    >
-                      {titleBackgroundColor === color && (
                         <Check 
                           size={16} 
                           className={`mx-auto ${

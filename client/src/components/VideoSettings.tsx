@@ -47,6 +47,7 @@ export default function VideoSettings({
   const [uploadedVideo, setUploadedVideo] = useState<UploadedVideo | null>(null);
   const [uploadingVideo, setUploadingVideo] = useState<boolean>(false);
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [selectedVideoIds, setSelectedVideoIds] = useState<number[]>([]);
   
   // Estado para la música de fondo
   const [useBackgroundMusic, setUseBackgroundMusic] = useState<boolean>(false);
@@ -452,19 +453,39 @@ export default function VideoSettings({
               {uploadedVideosQuery.data && Array.isArray(uploadedVideosQuery.data) && uploadedVideosQuery.data.length > 0 ? (
                 <div className="border border-gray-200 rounded-lg p-3 mt-2">
                   <div className="text-sm font-medium mb-2">Videos Disponibles:</div>
+                  <p className="text-xs text-gray-600 mb-3">
+                    Selecciona uno o más videos para usar en tu proyecto. Videos múltiples serán combinados.
+                  </p>
                   <div className="flex flex-col space-y-2">
                     {uploadedVideosQuery.data.map((video: UploadedVideo) => (
-                      <button
+                      <div
                         key={video.id}
                         className={`text-left p-2 rounded-md flex items-center ${
-                          uploadedVideo?.id === video.id 
+                          selectedVideoIds.includes(video.id) 
                             ? 'bg-blue-50 border border-blue-200' 
                             : 'border border-gray-200 hover:bg-gray-50'
                         }`}
-                        onClick={() => setUploadedVideo(video)}
                       >
+                        <div className="flex-shrink-0 mr-2">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedVideoIds.includes(video.id)}
+                            onChange={() => {
+                              // Toggle selection
+                              if (selectedVideoIds.includes(video.id)) {
+                                setSelectedVideoIds(selectedVideoIds.filter(id => id !== video.id));
+                              } else {
+                                setSelectedVideoIds([...selectedVideoIds, video.id]);
+                              }
+                              
+                              // Also set this as the primary video for backward compatibility
+                              setUploadedVideo(video);
+                            }}
+                            className="w-4 h-4 accent-blue-600"
+                          />
+                        </div>
                         <FileVideo className={`w-4 h-4 mr-2 ${
-                          uploadedVideo?.id === video.id ? 'text-blue-500' : 'text-gray-500'
+                          selectedVideoIds.includes(video.id) ? 'text-blue-500' : 'text-gray-500'
                         }`} />
                         <div className="flex-1">
                           <div className="font-medium truncate w-60">{video.filename}</div>
@@ -472,11 +493,22 @@ export default function VideoSettings({
                             {formatDuration(video.duration || 0)} • {video.width}×{video.height}
                           </div>
                         </div>
-                        {uploadedVideo?.id === video.id && (
-                          <Check className="w-4 h-4 text-blue-500" />
-                        )}
-                      </button>
+                      </div>
                     ))}
+                  </div>
+                  
+                  <div className="flex items-center justify-between mt-3 text-sm">
+                    <span className="text-gray-600">
+                      {selectedVideoIds.length} {selectedVideoIds.length === 1 ? 'video seleccionado' : 'videos seleccionados'}
+                    </span>
+                    {selectedVideoIds.length > 0 && (
+                      <button 
+                        className="text-red-500 hover:text-red-700"
+                        onClick={() => setSelectedVideoIds([])}
+                      >
+                        Limpiar selección
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : null}

@@ -114,6 +114,7 @@ export const generateAudioSchema = z.object({
 export const generateVideoSchema = z.object({
   photoIds: z.array(z.string().min(1)).optional(),
   uploadedVideoId: z.number().optional(),
+  uploadedVideoIds: z.array(z.number()).optional(), // Array of video IDs for multiple videos
   audioId: z.number(),
   backgroundMusicId: z.number().optional(),
   backgroundMusicVolume: z.number().min(0).max(1).default(0.2), // Volumen de la música (0-1)

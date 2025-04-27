@@ -89,6 +89,7 @@ export const projects = pgTable("projects", {
   showTitle: boolean("show_title"),
   titleFontSize: integer("title_font_size"),
   titleColor: text("title_color"),
+  titleBackgroundColor: text("title_background_color"),
   titlePosition: text("title_position"),
   backgroundMusicId: integer("background_music_id"),
   backgroundMusicVolume: integer("background_music_volume"),
@@ -191,6 +192,7 @@ export const appSettings = pgTable("app_settings", {
   titleText: text("title_text").default(""), // Texto a mostrar como overlay
   titleFontSize: integer("title_font_size").default(32),
   titleColor: text("title_color").default("#ffffff"),
+  titleBackgroundColor: text("title_background_color").default("red"),
   titlePosition: text("title_position").default("top-center"), // top-center, bottom-center
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),

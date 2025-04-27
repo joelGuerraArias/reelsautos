@@ -1114,29 +1114,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Permitimos hasta 60 caracteres por línea según lo solicitado
           const maxCharsPerLine = 60;
           
-          // Forzar color de texto blanco según lo solicitado
-          const textColor = '#ffffff'; // Siempre blanco
+          // Obtener el color de texto de la configuración (por defecto blanco)
+          const textColor = appSettings.titleColor || '#ffffff';
           
-          // Forzar tamaño de fuente a 24px según lo solicitado
-          const fontSize = 24; // Tamaño fijo
+          // Obtener el tamaño de fuente de la configuración (por defecto 24px)
+          const fontSize = appSettings.titleFontSize || 24;
+          
+          // Obtener el color de fondo del texto de la configuración (por defecto rojo)
+          const backgroundColor = appSettings.titleBackgroundColor || 'red';
           
           // Escapar comillas simples
           const text = titleText.replace(/'/g, "\\'"); // Escape single quotes
         
           // Título estilo moderno: caja redondeada con texto centrado como en la imagen
-          // Usamos un estilo de texto tipo "pill" o pastilla con fondo rojo y esquinas redondeadas
+          // Usamos un estilo de texto tipo "pill" o pastilla con fondo de color configurable y esquinas redondeadas
           // Perfectamente centrado horizontal y verticalmente
           const textX = '(w-tw)/2'; // Centrado horizontal exacto
-          const textY = 'h-th-150'; // Subimos la posición un 25% aproximadamente (desde 50px a 150px del borde inferior)
+          const textY = 'h-th-150'; // 150px desde el borde inferior
           
-          // Estilo moderno: texto blanco sobre fondo con color configurable y esquinas redondeadas
+          // Estilo moderno: texto con color configurable sobre fondo con color configurable y esquinas redondeadas
           // FFmpeg drawtext no soporta directamente bordes redondeados para el fondo
           // Usamos un padding generoso (boxborderw) para simular bordes redondeados
-          // Debemos crear una solución alternativa usando un rectángulo con bordes redondeados
-          // El color del fondo es configurable pero el texto siempre es blanco
           // Escapar las comillas simples y dobles para evitar problemas con FFmpeg
           const escapedText = text.replace(/'/g, "'\\''").replace(/"/g, '\\"');
-          textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${escapedText}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=red@0.9:boxborderw=10`;
+          textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${escapedText}':fontcolor=${textColor}:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=${backgroundColor}@0.9:boxborderw=10`;
           
           console.log(`Aplicando texto con saltos de línea: "${titleText}" con tamaño ${fontSize}px`);
         }

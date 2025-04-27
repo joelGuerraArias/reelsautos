@@ -52,6 +52,7 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
   // Estado para la funcionalidad de video subido
   const [useUploadedVideo, setUseUploadedVideo] = useState<boolean>(false);
   const [uploadedVideo, setUploadedVideo] = useState<UploadedVideo | null>(null);
+  const [selectedVideoIds, setSelectedVideoIds] = useState<number[]>([]);
   const [uploadingVideo, setUploadingVideo] = useState<boolean>(false);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   
@@ -224,16 +225,23 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
       
       setIsGenerating(true);
       
-      // Construir el payload según si estamos usando fotos o video subido
+      // Construir el payload según si estamos usando fotos o videos subidos
       const payload: any = {
         audioId: audio.id,
         projectId
       };
       
-      // Agregar fotos o video subido
-      if (useUploadedVideo && uploadedVideo) {
-        payload.uploadedVideoId = uploadedVideo.id;
+      // Agregar fotos o videos subidos
+      if (useUploadedVideo) {
+        if (selectedVideoIds.length > 0) {
+          // Si hay múltiples videos seleccionados, enviamos el array
+          payload.uploadedVideoIds = selectedVideoIds;
+        } else if (uploadedVideo) {
+          // Compatibilidad con la versión anterior (un solo video)
+          payload.uploadedVideoId = uploadedVideo.id;
+        }
       } else {
+        // Usar fotos
         payload.photoIds = photos.map(photo => photo.id.toString());
       }
       
@@ -320,10 +328,20 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
               <>
                 <h3 className="font-medium text-gray-800 mb-2 flex items-center">
                   <FileVideo className="w-4 h-4 mr-1 text-blue-500" />
-                  Video Subido
+                  {selectedVideoIds.length > 1 ? "Videos Seleccionados" : "Video Subido"}
                 </h3>
                 <div className="text-gray-700">
-                  {uploadedVideo ? (
+                  {selectedVideoIds.length > 0 ? (
+                    <>
+                      <p className="mb-1"><span className="font-medium">{selectedVideoIds.length}</span> videos seleccionados</p>
+                      {uploadedVideo && (
+                        <>
+                          <p className="mb-1">Resolución: {uploadedVideo.width}×{uploadedVideo.height}</p>
+                          <p>Duración combinada: {formatDuration(uploadedVideo.duration || 0)}+ </p>
+                        </>
+                      )}
+                    </>
+                  ) : uploadedVideo ? (
                     <>
                       <p className="mb-1"><span className="font-medium">{uploadedVideo.filename}</span></p>
                       <p className="mb-1">Resolución: {uploadedVideo.width}×{uploadedVideo.height}</p>

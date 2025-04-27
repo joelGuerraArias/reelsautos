@@ -1123,15 +1123,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Escapar comillas simples
           const text = titleText.replace(/'/g, "\\'"); // Escape single quotes
         
-          // Título simple: texto blanco centrado sin fondo
+          // Título con fondo negro que solo cubre el texto
           // Perfectamente centrado horizontal y verticalmente
           const textX = '(w-tw)/2'; // Centrado horizontal exacto
           const textY = 'h-th-150'; // Subimos la posición un 25% aproximadamente (desde 50px a 150px del borde inferior)
           
-          // Estilo simple: texto blanco sin fondo (eliminado el fondo del texto que causaba errores)
+          // Estilo con fondo negro que solo cubre el texto (mejor estabilidad)
           // Escapar las comillas simples y dobles para evitar problemas con FFmpeg
           const escapedText = text.replace(/'/g, "'\\''").replace(/"/g, '\\"');
-          textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${escapedText}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}`;
+          textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${escapedText}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=black@0.8:boxborderw=5`;
           
           console.log(`Aplicando texto con saltos de línea: "${titleText}" con tamaño ${fontSize}px`);
         }

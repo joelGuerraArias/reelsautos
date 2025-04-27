@@ -63,6 +63,7 @@ export const videos = pgTable("videos", {
   duration: integer("duration"),
   photoIds: text("photo_ids").array(),
   uploadedVideoId: integer("uploaded_video_id"),
+  uploadedVideoIds: integer("uploaded_video_ids").array(),
   audioId: integer("audio_id").notNull(),
   backgroundMusicId: integer("background_music_id"),
   backgroundMusicVolume: text("background_music_volume").default("0.2"),

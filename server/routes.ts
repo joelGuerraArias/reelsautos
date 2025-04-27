@@ -932,6 +932,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { 
         photoIds, 
         uploadedVideoId, 
+        uploadedVideoIds,
         audioId, 
         backgroundMusicId, 
         backgroundMusicVolume, 
@@ -944,9 +945,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Audio not found" });
       }
       
-      // Verificar si estamos procesando fotos o un video subido
+      // Verificar si estamos procesando fotos o videos subidos
       let photos = [];
       let uploadedVideo = null;
+      let uploadedVideos = [];
       
       if (photoIds && photoIds.length > 0) {
         // Procesar con fotos
@@ -958,14 +960,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (photos.includes(undefined)) {
           return res.status(404).json({ error: "One or more photos not found" });
         }
+      } else if (uploadedVideoIds && uploadedVideoIds.length > 0) {
+        // Procesar con múltiples videos subidos
+        uploadedVideos = await Promise.all(
+          uploadedVideoIds.map(async (id) => await storage.getUploadedVideo(id))
+        );
+        
+        // Verificar que todos los videos existan
+        if (uploadedVideos.includes(undefined) || uploadedVideos.some(v => v === null)) {
+          return res.status(404).json({ error: "One or more videos not found" });
+        }
       } else if (uploadedVideoId) {
-        // Procesar con video subido
+        // Procesar con un solo video subido (para compatibilidad)
         uploadedVideo = await storage.getUploadedVideo(uploadedVideoId);
         if (!uploadedVideo) {
           return res.status(404).json({ error: "Uploaded video not found" });
         }
+        // Convertir a array para procesamiento uniforme
+        uploadedVideos = [uploadedVideo];
       } else {
-        return res.status(400).json({ error: "Either photos or an uploaded video must be provided" });
+        return res.status(400).json({ error: "Either photos or uploaded videos must be provided" });
       }
       
       // Esta validación ya se hizo arriba cuando tenemos photoIds, así que la eliminamos
@@ -1282,66 +1296,127 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.warn("Error cleaning up temp files:", e);
           }
         }, 2000);
-      } else if (uploadedVideo && uploadedVideo.filepath) {
-        // Procesar usando un video subido
-        console.log("Procesando con video subido:", uploadedVideo.filename);
-        let command;
+      } else if (uploadedVideos.length > 0) {
+        // Procesar usando videos subidos (uno o múltiples)
+        console.log(`Procesando con ${uploadedVideos.length} videos subidos`);
         
-        // Necesitamos sincronizar el audio con el video, potencialmente recortando el video
-        // o añadiendo bucles si es necesario
-        const videoTempPath = path.join(tempDir, `temp_video_${nanoid()}.mp4`);
+        // Array para almacenar las rutas de los videos procesados
+        const processedVideos = [];
         
-        // Primero procesamos el video para aplicar logo y texto
-        if (hasLogo) {
-          // Si hay logo, usamos filtergraph complejo
-          // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
-          const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
-          // Usar comillas dobles para escapar el texto dentro del comando FFmpeg
-          const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -c:v libx264 -pix_fmt yuv420p -shortest "${videoTempPath}"`;
-          console.log("Comando FFmpeg para video con logo:", processVideoCommand);
-          await exec(processVideoCommand);
-        } else {
-          // Sin logo, solo aplicamos texto si es necesario
-          // Si hay texto, necesitamos aplicarlo como un filtro drawtext separado
-          if (textOverlay) {
-            const drawTextFilter = textOverlay.replace(/^,/, '');
-            const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,${drawTextFilter}" -c:v libx264 -pix_fmt yuv420p "${videoTempPath}"`;
-            console.log("Comando FFmpeg para video sin logo, con texto:", processVideoCommand);
+        // Procesar cada video subido
+        for (let i = 0; i < uploadedVideos.length; i++) {
+          const currentVideo = uploadedVideos[i];
+          if (!currentVideo || !currentVideo.filepath) continue;
+          
+          console.log(`Procesando video ${i+1}/${uploadedVideos.length}: ${currentVideo.filename}`);
+          
+          // Ruta temporal para este video procesado
+          const videoTempPath = path.join(tempDir, `temp_video_${i}_${nanoid()}.mp4`);
+          
+          // Procesar el video para aplicar logo y texto
+          if (hasLogo) {
+            // Si hay logo, usamos filtergraph complejo
+            // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
+            const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
+            // Usar comillas dobles para escapar el texto dentro del comando FFmpeg
+            const processVideoCommand = `ffmpeg -i "${currentVideo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -c:v libx264 -pix_fmt yuv420p -shortest "${videoTempPath}"`;
+            console.log(`Aplicando logo y texto al video ${i+1}`);
             await exec(processVideoCommand);
           } else {
-            const processVideoCommand = `ffmpeg -i "${uploadedVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720" -c:v libx264 -pix_fmt yuv420p "${videoTempPath}"`;
-            await exec(processVideoCommand);
+            // Sin logo, solo aplicamos texto si es necesario
+            if (textOverlay) {
+              const drawTextFilter = textOverlay.replace(/^,/, '');
+              const processVideoCommand = `ffmpeg -i "${currentVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,${drawTextFilter}" -c:v libx264 -pix_fmt yuv420p "${videoTempPath}"`;
+              console.log(`Aplicando texto al video ${i+1}`);
+              await exec(processVideoCommand);
+            } else {
+              const processVideoCommand = `ffmpeg -i "${currentVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720" -c:v libx264 -pix_fmt yuv420p "${videoTempPath}"`;
+              console.log(`Escalando video ${i+1}`);
+              await exec(processVideoCommand);
+            }
           }
-
-          // No hay llamada adicional a processVideoCommand aquí
+          
+          // Añadir el video procesado a la lista
+          processedVideos.push(videoTempPath);
         }
         
-        // Luego combinamos el video procesado con el audio
-        if (backgroundMusic && backgroundMusic.filepath) {
-          // Si hay música de fondo, mezclamos el audio principal con la música
-          const musicVolume = backgroundMusicVolume || 0.2; // Valor por defecto
-          
-          // Crear un archivo temporal para la mezcla de audio
-          const mixedAudioPath = path.join(tempDir, `mixed_audio_${nanoid()}.mp3`);
-          
-          // Mezclar el audio principal con la música de fondo
-          const mixAudioCommand = `ffmpeg -i "${audio.filepath}" -i "${backgroundMusic.filepath}" -filter_complex "[0:a]volume=1.0[a1];[1:a]volume=${musicVolume}[a2];[a1][a2]amix=inputs=2:duration=longest[aout]" -map "[aout]" "${mixedAudioPath}"`;
-          await exec(mixAudioCommand);
-          
-          // Combinar el video procesado con el audio mezclado
-          command = `ffmpeg -i "${videoTempPath}" -i "${mixedAudioPath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;
-          await exec(command);
-          
-          // Limpiar el archivo de audio mezclado
-          fs.unlinkSync(mixedAudioPath);
+        // Si no se procesó ningún video correctamente, lanzar error
+        if (processedVideos.length === 0) {
+          throw new Error("No se pudo procesar ningún video");
+        }
+        
+        // Si solo hay un video procesado
+        if (processedVideos.length === 1) {
+          // Combinar el único video procesado con el audio
+          if (backgroundMusic && backgroundMusic.filepath) {
+            // Si hay música de fondo, mezclamos el audio principal con la música
+            const musicVolume = backgroundMusicVolume || 0.2; // Valor por defecto
+            
+            // Crear un archivo temporal para la mezcla de audio
+            const mixedAudioPath = path.join(tempDir, `mixed_audio_${nanoid()}.mp3`);
+            
+            // Mezclar el audio principal con la música de fondo
+            const mixAudioCommand = `ffmpeg -i "${audio.filepath}" -i "${backgroundMusic.filepath}" -filter_complex "[0:a]volume=1.0[a1];[1:a]volume=${musicVolume}[a2];[a1][a2]amix=inputs=2:duration=longest[aout]" -map "[aout]" "${mixedAudioPath}"`;
+            await exec(mixAudioCommand);
+            
+            // Combinar el video procesado con el audio mezclado
+            const command = `ffmpeg -i "${processedVideos[0]}" -i "${mixedAudioPath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;
+            await exec(command);
+            
+            // Limpiar el archivo de audio mezclado
+            fs.unlinkSync(mixedAudioPath);
+          } else {
+            // Sin música de fondo, solo combinamos con el audio principal
+            const command = `ffmpeg -i "${processedVideos[0]}" -i "${audio.filepath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;
+            await exec(command);
+          }
         } else {
-          // Sin música de fondo, solo combinamos con el audio principal
-          command = `ffmpeg -i "${videoTempPath}" -i "${audio.filepath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;
-          await exec(command);
+          // Si hay múltiples videos, concatenarlos primero
+          console.log(`Concatenando ${processedVideos.length} videos...`);
+          
+          // Crear archivo de lista para concatenación
+          const concatFilePath = path.join(tempDir, `concat_list_${nanoid()}.txt`);
+          const concatFileContent = processedVideos.map(video => `file '${video.replace(/'/g, "'\\''")}'\n`).join('');
+          fs.writeFileSync(concatFilePath, concatFileContent);
+          
+          // Concatenar videos
+          const concatOutputPath = path.join(tempDir, `concat_output_${nanoid()}.mp4`);
+          const concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c copy "${concatOutputPath}"`;
+          await exec(concatCommand);
+          
+          // Ahora combinar el video concatenado con el audio
+          if (backgroundMusic && backgroundMusic.filepath) {
+            // Si hay música de fondo, mezclamos el audio principal con la música
+            const musicVolume = backgroundMusicVolume || 0.2; // Valor por defecto
+            
+            // Crear un archivo temporal para la mezcla de audio
+            const mixedAudioPath = path.join(tempDir, `mixed_audio_${nanoid()}.mp3`);
+            
+            // Mezclar el audio principal con la música de fondo
+            const mixAudioCommand = `ffmpeg -i "${audio.filepath}" -i "${backgroundMusic.filepath}" -filter_complex "[0:a]volume=1.0[a1];[1:a]volume=${musicVolume}[a2];[a1][a2]amix=inputs=2:duration=longest[aout]" -map "[aout]" "${mixedAudioPath}"`;
+            await exec(mixAudioCommand);
+            
+            // Combinar el video concatenado con el audio mezclado
+            const finalCommand = `ffmpeg -i "${concatOutputPath}" -i "${mixedAudioPath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;
+            await exec(finalCommand);
+            
+            // Limpiar el archivo de audio mezclado
+            fs.unlinkSync(mixedAudioPath);
+          } else {
+            // Sin música de fondo, solo combinamos con el audio principal
+            const finalCommand = `ffmpeg -i "${concatOutputPath}" -i "${audio.filepath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;
+            await exec(finalCommand);
+          }
+          
+          // Limpiar el archivo de concatenación y el video concatenado
+          fs.unlinkSync(concatFilePath);
+          fs.unlinkSync(concatOutputPath);
         }
         
-        // Limpiar el archivo de video temporal
-        fs.unlinkSync(videoTempPath);
+        // Limpiar los archivos de video temporales
+        for (const video of processedVideos) {
+          fs.unlinkSync(video);
+        }
       } else {
         throw new Error("No valid photos or uploaded video provided");
       }
@@ -1351,7 +1426,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filename: outputFilename,
         filepath: outputPath,
         duration: audio.duration,
-        photoIds: photoIds,
+        photoIds: photoIds || [],
+        uploadedVideoIds: uploadedVideos.map(v => v.id),
         audioId,
         projectId,
         createdAt: new Date().toISOString()

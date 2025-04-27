@@ -34,6 +34,7 @@ export default function Home() {
   const [currentStep, setCurrentStep] = useState<Step>(Step.UPLOAD_PHOTOS);
   const [projectId, setProjectId] = useState<string>(nanoid());
   const [error, setError] = useState<string | null>(null);
+  const [selectedVideoIds, setSelectedVideoIds] = useState<number[]>([]);
   
   // Queries for project data
   const photosQuery = useQuery({
@@ -260,6 +261,8 @@ export default function Home() {
               onBack={goToPreviousStep}
               onContinue={goToNextStep}
               uploadedVideos={uploadedVideosQuery.data as any[]}
+              selectedVideoIds={selectedVideoIds}
+              onVideoSelectionChange={setSelectedVideoIds}
             />
           </div>
         );
@@ -278,6 +281,8 @@ export default function Home() {
                 photos={photosQuery.data as Photo[]} 
                 audio={audioQuery.data as Audio}
                 onBack={goToPreviousStep}
+                uploadedVideos={uploadedVideosQuery.data as any[]}
+                selectedVideoIds={selectedVideoIds}
               />
             ) : (
               <VideoPreview 

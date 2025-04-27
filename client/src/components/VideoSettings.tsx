@@ -17,6 +17,8 @@ interface VideoSettingsProps {
   onBack: () => void;
   onContinue: () => void;
   uploadedVideos?: UploadedVideo[];
+  selectedVideoIds?: number[];
+  onVideoSelectionChange?: (ids: number[]) => void;
 }
 
 export default function VideoSettings({ 
@@ -25,7 +27,9 @@ export default function VideoSettings({
   audio, 
   onBack, 
   onContinue, 
-  uploadedVideos 
+  uploadedVideos,
+  selectedVideoIds: initialSelectedVideoIds,
+  onVideoSelectionChange
 }: VideoSettingsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -47,7 +51,14 @@ export default function VideoSettings({
   const [uploadedVideo, setUploadedVideo] = useState<UploadedVideo | null>(null);
   const [uploadingVideo, setUploadingVideo] = useState<boolean>(false);
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [selectedVideoIds, setSelectedVideoIds] = useState<number[]>([]);
+  const [selectedVideoIds, setSelectedVideoIds] = useState<number[]>(initialSelectedVideoIds || []);
+  
+  // Efecto para notificar cambios en los videos seleccionados
+  useEffect(() => {
+    if (onVideoSelectionChange) {
+      onVideoSelectionChange(selectedVideoIds);
+    }
+  }, [selectedVideoIds, onVideoSelectionChange]);
   
   // Estado para la música de fondo
   const [useBackgroundMusic, setUseBackgroundMusic] = useState<boolean>(false);

@@ -1,9 +1,9 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Cloud, Info, CheckCircle, Upload, FileVideo, Film } from "lucide-react";
+import { Cloud, Info, CheckCircle, Upload, FileVideo, Film, Plus, X, Trash2 } from "lucide-react";
 import { validatePhoto } from "@/lib/utils";
 import { formatFileSize, formatDuration } from "@/lib/utils";
 import { UploadedVideo } from "@shared/schema";
@@ -19,6 +19,40 @@ export default function PhotoUploader({ projectId }: PhotoUploaderProps) {
   const [uploadType, setUploadType] = useState<'photos' | 'video'>('photos');
   const [uploadedVideo, setUploadedVideo] = useState<UploadedVideo | null>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  
+  // Obtener videos previamente subidos para este proyecto
+  const { data: uploadedVideos = [] } = useQuery({
+    queryKey: [`/api/projects/${projectId}/uploaded-videos`],
+    enabled: !!projectId && uploadType === 'video',
+  });
+  
+  // Mutation para eliminar un video
+  const deleteVideoMutation = useMutation({
+    mutationFn: async (videoId: number) => {
+      return apiRequest('DELETE', `/api/uploaded-videos/${videoId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/uploaded-videos`] });
+      toast({
+        title: "Video eliminado",
+        description: "El video ha sido eliminado correctamente",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error al eliminar",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+  
+  // Manejador para eliminar un video
+  const handleDeleteVideo = (videoId: number) => {
+    if (confirm('¿Estás seguro de que quieres eliminar este video?')) {
+      deleteVideoMutation.mutate(videoId);
+    }
+  };
   
   // Photo upload mutation
   const uploadPhotoMutation = useMutation({
@@ -230,26 +264,64 @@ export default function PhotoUploader({ projectId }: PhotoUploaderProps) {
       ) : (
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
-            {uploadedVideo ? (
-              <div className="border rounded-lg p-6 bg-gray-50">
-                <div className="flex items-center justify-between mb-4">
+            {/* Lista de videos subidos */}
+            {uploadedVideos && uploadedVideos.length > 0 ? (
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
                   <h3 className="font-medium text-gray-800 flex items-center">
                     <FileVideo className="w-5 h-5 mr-2 text-blue-500" />
-                    Video Subido
+                    Videos Subidos ({uploadedVideos.length})
                   </h3>
-                  <button 
-                    onClick={() => setUploadedVideo(null)} 
-                    className="text-red-500 hover:text-red-600"
-                    title="Eliminar video"
-                  >
-                    <Info className="w-4 h-4" />
-                  </button>
                 </div>
-                <div className="text-gray-700 space-y-2">
-                  <p className="font-medium">{uploadedVideo.filename}</p>
-                  <p>Duración: {formatDuration(uploadedVideo.duration || 0)}</p>
-                  <p>Tamaño: {formatFileSize(uploadedVideo.size)}</p>
-                  <p>Resolución: {uploadedVideo.width}×{uploadedVideo.height}</p>
+                
+                <div className="space-y-3">
+                  {uploadedVideos.map((video: UploadedVideo) => (
+                    <div key={video.id} className="border rounded-lg p-4 bg-gray-50">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="font-medium truncate max-w-[250px]">{video.filename}</p>
+                        <button 
+                          onClick={() => handleDeleteVideo(video.id)} 
+                          className="text-red-500 hover:text-red-600"
+                          title="Eliminar video"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="text-sm text-gray-700 grid grid-cols-2 gap-2">
+                        <p>Duración: {formatDuration(video.duration || 0)}</p>
+                        <p>Tamaño: {formatFileSize(video.size)}</p>
+                        <p>Resolución: {video.width}×{video.height}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Botón para subir más videos */}
+                <div className="mt-4">
+                  <input
+                    type="file"
+                    id="video-upload-more"
+                    className="hidden"
+                    accept="video/mp4,video/quicktime,video/webm"
+                    ref={videoInputRef}
+                    onChange={handleVideoUpload}
+                  />
+                  <label 
+                    htmlFor="video-upload-more"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer inline-flex items-center"
+                  >
+                    <Plus size={16} className="mr-2" />
+                    {isUploadingVideo ? 'Subiendo...' : 'Subir otro video'}
+                  </label>
+                  
+                  {isUploadingVideo && (
+                    <div className="mt-4">
+                      <div className="w-full bg-gray-200 rounded-full h-2.5">
+                        <div className="bg-blue-500 h-2.5 rounded-full animate-pulse w-3/4"></div>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Subiendo video...</p>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (

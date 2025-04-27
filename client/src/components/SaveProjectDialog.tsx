@@ -46,14 +46,11 @@ export default function SaveProjectDialog({
 
     setIsSaving(true);
     try {
-      const response = await apiRequest(`/api/projects/${projectId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          title,
-          description: description.trim() || null,
-          isTemplate,
-          updatedAt: new Date().toISOString()
-        })
+      const response = await apiRequest(`/api/projects/${projectId}`, 'PATCH', {
+        title,
+        description: description.trim() || null,
+        isTemplate,
+        updatedAt: new Date().toISOString()
       });
 
       if (response.ok) {

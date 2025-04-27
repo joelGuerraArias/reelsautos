@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest } from "@/lib/queryClient";
-import { FilePlus, FileEdit, Template, Copy, Trash2 } from "lucide-react";
+import { FilePlus, FileEdit, BookCopy, Copy, Trash2 } from "lucide-react";
 
 // Función para formatear fechas
 const formatDate = (dateString: string) => {

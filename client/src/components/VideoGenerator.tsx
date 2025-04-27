@@ -608,6 +608,7 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
               ) : uploadedVideosQuery.data && Array.isArray(uploadedVideosQuery.data) && uploadedVideosQuery.data.length > 0 ? (
                 <div className="space-y-3">
                   <p className="text-sm text-gray-600 mb-2">Selecciona los videos que quieres incluir:</p>
+                  <p className="text-xs text-blue-600 mb-3 italic">Puedes seleccionar múltiples videos para concatenarlos en orden</p>
                   {uploadedVideosQuery.data && Array.isArray(uploadedVideosQuery.data) && (uploadedVideosQuery.data as UploadedVideo[]).map((video: UploadedVideo) => (
                     <button
                       key={video.id}

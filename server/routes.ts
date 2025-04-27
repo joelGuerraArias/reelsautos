@@ -1207,10 +1207,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Construir el comando FFmpeg optimizado
         const allFilters = filterComplex.join(';');
-        let command = `ffmpeg${inputArgs} -i "${audio.filepath}" -filter_complex "${allFilters}" -map "[outv]" -map ${photos.length + (hasLogo ? 1 : 0)}:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+        // Corregir el índice del audio para el mapeo
+        const audioIndex = photos.length + (hasLogo ? 1 : 0);
+        // Asegurar que usamos el formato correcto para el -map
+        let command = `ffmpeg${inputArgs} -i "${audio.filepath}" -filter_complex "${allFilters}" -map "[outv]" -map ${audioIndex}:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
         
         console.log("Comando FFmpeg optimizado:", command);
-        await exec(command);
+        
+        try {
+          await exec(command);
+        } catch (execError) {
+          console.error("Error en la ejecución del comando FFmpeg:", execError);
+          // Intentar con un enfoque alternativo si el primer método falla
+          console.log("Intentando método alternativo...");
+          
+          // Método alternativo: procesar cada imagen por separado y luego concatenar (el enfoque original)
+          const concatContent = [];
+          
+          for (let i = 0; i < photos.length; i++) {
+            const photo = photos[i];
+            if (photo && photo.filepath) {
+              // Crear un segmento de imagen estática con overlay básico
+              const tempOutput = path.join(tempDir, `temp_${i}.mp4`);
+              const basicCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
+              
+              await exec(basicCommand);
+              concatContent.push(tempOutput);
+            }
+          }
+          
+          if (concatContent.length > 0) {
+            // Crear el archivo de lista para concat
+            const concatFilePath = path.join(tempDir, 'concat_list.txt');
+            const concatListContent = concatContent.map(file => `file '${file}'`).join('\n');
+            fs.writeFileSync(concatFilePath, concatListContent);
+            
+            // Crear output file sin audio
+            const tempVideoOutput = path.join(tempDir, 'temp_video_output.mp4');
+            const concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c copy "${tempVideoOutput}"`;
+            await exec(concatCommand);
+            
+            // Añadir audio al video final
+            const finalCommand = `ffmpeg -i "${tempVideoOutput}" -i "${audio.filepath}" -c:v copy -c:a aac -b:a 192k -shortest "${outputPath}"`;
+            await exec(finalCommand);
+            
+            // Limpiar archivos temporales
+            for (const tempFile of concatContent) {
+              if (fs.existsSync(tempFile)) {
+                fs.unlinkSync(tempFile);
+              }
+            }
+            fs.unlinkSync(concatFilePath);
+            fs.unlinkSync(tempVideoOutput);
+          } else {
+            throw new Error("No se pudo procesar ninguna foto con el método alternativo");
+          }
+        }
         
         // Clean up any temp files
         setTimeout(() => {
@@ -1316,7 +1368,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const validationError = fromZodError(error);
         res.status(400).json({ error: validationError.message });
       } else {
-        res.status(500).json({ error: "Failed to generate video" });
+        // Mostrar error detallado para ayudar en la depuración
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error("Error detallado:", errorMessage);
+        res.status(500).json({ error: `Error al generar video: ${errorMessage}` });
       }
     }
   });

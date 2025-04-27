@@ -81,12 +81,15 @@ export type Video = typeof videos.$inferSelect;
 export const projects = pgTable("projects", {
   id: text("id").primaryKey(),
   title: text("title").notNull(),
+  description: text("description"),
   createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at"),
   // Configuración guardada del proyecto
   selectedVoiceId: text("selected_voice_id"),
   selectedLogoId: integer("selected_logo_id"),
   logoPosition: text("logo_position"),
   showTitle: boolean("show_title"),
+  titleText: text("title_text"),
   titleFontSize: integer("title_font_size"),
   titleColor: text("title_color"),
   titlePosition: text("title_position"),

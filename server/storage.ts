@@ -1,19 +1,21 @@
-import { 
-  Photo, InsertPhoto, 
-  Audio, InsertAudio, 
-  Video, InsertVideo, 
-  Project, InsertProject,
-  User, InsertUser,
-  UserPreferences, InsertUserPreferences,
-  SavedVoice, InsertSavedVoice,
-  Logo, InsertLogo,
-  SavedLogo, InsertSavedLogo,
-  AppSettings, InsertAppSettings,
-  BackgroundMusic, InsertBackgroundMusic,
-  UploadedVideo, InsertUploadedVideo
+import { eq, and, desc } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import {
+  users, type User, type InsertUser,
+  projects, type Project, type InsertProject,
+  photos, type Photo, type InsertPhoto,
+  audios, type Audio, type InsertAudio,
+  videos, type Video, type InsertVideo,
+  savedVoices, type SavedVoice, type InsertSavedVoice,
+  logos, type Logo, type InsertLogo,
+  savedLogos, type SavedLogo, type InsertSavedLogo,
+  appSettings, type AppSettings, type InsertAppSettings,
+  userPreferences, type UserPreferences, type InsertUserPreferences,
+  backgroundMusic, type BackgroundMusic, type InsertBackgroundMusic,
+  uploadedVideos, type UploadedVideo, type InsertUploadedVideo
 } from "@shared/schema";
+import { db } from "./db";
 
-// Modify the interface with any CRUD methods you might need
 export interface IStorage {
   // User methods
   getUser(id: number): Promise<User | undefined>;
@@ -23,6 +25,10 @@ export interface IStorage {
   // Project methods
   createProject(project: InsertProject): Promise<Project>;
   getProject(id: string): Promise<Project | undefined>;
+  updateProject(id: string, project: Partial<InsertProject>): Promise<Project>;
+  getAllProjects(): Promise<Project[]>;
+  getTemplates(): Promise<Project[]>;
+  getLatestTemplate(): Promise<Project | undefined>;
   
   // Photo methods
   createPhoto(photo: InsertPhoto): Promise<Photo>;
@@ -39,6 +45,7 @@ export interface IStorage {
   createVideo(video: InsertVideo): Promise<Video>;
   getVideo(id: number): Promise<Video | undefined>;
   getVideoByProjectId(projectId: string): Promise<Video | undefined>;
+  getVideosByProjectId(projectId: string): Promise<Video[]>;
   
   // Legacy User Preferences methods
   getFavoriteVoice(): Promise<UserPreferences | undefined>;
@@ -87,482 +94,378 @@ export interface IStorage {
   deleteUploadedVideo(id: number): Promise<boolean>;
 }
 
-export class MemStorage implements IStorage {
-  // Propiedades de acceso publico para poder actualizar directamente
-  // (en una implementación real estas serían privadas y se usarían métodos adecuados)
-  public projects: Map<string, Project>;
+export class DatabaseStorage implements IStorage {
   
-  // Propiedades privadas
-  private users: Map<number, User>;
-  private photos: Map<number, Photo>;
-  private audios: Map<number, Audio>;
-  private videos: Map<number, Video>;
-  private userPreferences: UserPreferences | undefined;
-  private savedVoices: Map<number, SavedVoice>;
-  private logos: Map<number, Logo>;
-  private savedLogos: Map<number, SavedLogo>;
-  private appSettings: AppSettings | undefined;
-  private backgroundMusics: Map<number, BackgroundMusic>;
-  private uploadedVideos: Map<number, UploadedVideo>;
-  
-  private userId: number;
-  private photoId: number;
-  private audioId: number;
-  private videoId: number;
-  private preferenceId: number;
-  private savedVoiceId: number;
-  private logoId: number;
-  private appSettingsId: number;
-  private backgroundMusicId: number;
-  private uploadedVideoId: number;
-
-  private savedLogoId: number;
-
-  constructor() {
-    this.users = new Map();
-    this.projects = new Map();
-    this.photos = new Map();
-    this.audios = new Map();
-    this.videos = new Map();
-    this.savedVoices = new Map();
-    this.logos = new Map();
-    this.savedLogos = new Map();
-    this.backgroundMusics = new Map();
-    this.uploadedVideos = new Map();
-    
-    this.userId = 1;
-    this.photoId = 1;
-    this.audioId = 1;
-    this.videoId = 1;
-    this.preferenceId = 1;
-    this.savedVoiceId = 1;
-    this.logoId = 1;
-    this.savedLogoId = 1;
-    this.appSettingsId = 1;
-    this.backgroundMusicId = 1;
-    this.uploadedVideoId = 1;
-  }
-
   // User methods
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const result = await db.select().from(users).where(eq(users.id, id));
+    return result[0];
   }
-
+  
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const result = await db.select().from(users).where(eq(users.username, username));
+    return result[0];
   }
-
+  
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.userId++;
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+    const result = await db.insert(users).values(insertUser).returning();
+    return result[0];
   }
   
   // Project methods
   async createProject(project: InsertProject): Promise<Project> {
-    this.projects.set(project.id, project as Project);
-    return project as Project;
+    // Asignar un ID si no se proporciona
+    if (!project.id) {
+      project.id = nanoid();
+    }
+    
+    // Asegurar que createdAt existe
+    if (!project.createdAt) {
+      project.createdAt = new Date().toISOString();
+    }
+    
+    const result = await db.insert(projects).values(project).returning();
+    return result[0];
   }
   
   async getProject(id: string): Promise<Project | undefined> {
-    return this.projects.get(id);
+    const result = await db.select().from(projects).where(eq(projects.id, id));
+    return result[0];
+  }
+  
+  async updateProject(id: string, project: Partial<InsertProject>): Promise<Project> {
+    // Actualizar la fecha de modificación
+    project.updatedAt = new Date().toISOString();
+    
+    const result = await db
+      .update(projects)
+      .set(project)
+      .where(eq(projects.id, id))
+      .returning();
+    
+    return result[0];
+  }
+  
+  async getAllProjects(): Promise<Project[]> {
+    return await db
+      .select()
+      .from(projects)
+      .where(eq(projects.isTemplate, false))
+      .orderBy(desc(projects.createdAt));
+  }
+  
+  async getTemplates(): Promise<Project[]> {
+    return await db
+      .select()
+      .from(projects)
+      .where(eq(projects.isTemplate, true))
+      .orderBy(desc(projects.createdAt));
+  }
+  
+  async getLatestTemplate(): Promise<Project | undefined> {
+    const result = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.isTemplate, true))
+      .orderBy(desc(projects.createdAt))
+      .limit(1);
+    
+    return result[0];
   }
   
   // Photo methods
   async createPhoto(photo: InsertPhoto): Promise<Photo> {
-    const id = this.photoId++;
-    const newPhoto: Photo = { ...photo, id };
-    this.photos.set(id, newPhoto);
-    return newPhoto;
+    const result = await db.insert(photos).values(photo).returning();
+    return result[0];
   }
   
   async getPhoto(id: number): Promise<Photo | undefined> {
-    return this.photos.get(id);
+    const result = await db.select().from(photos).where(eq(photos.id, id));
+    return result[0];
   }
   
   async getPhotosByProjectId(projectId: string): Promise<Photo[]> {
-    return Array.from(this.photos.values()).filter(
-      (photo) => photo.projectId === projectId
-    );
+    return await db
+      .select()
+      .from(photos)
+      .where(eq(photos.projectId, projectId));
   }
   
   async deletePhoto(id: number): Promise<boolean> {
-    return this.photos.delete(id);
+    const result = await db
+      .delete(photos)
+      .where(eq(photos.id, id))
+      .returning({ id: photos.id });
+    
+    return result.length > 0;
   }
   
   // Audio methods
   async createAudio(audio: InsertAudio): Promise<Audio> {
-    const id = this.audioId++;
-    const newAudio: Audio = { 
-      ...audio, 
-      id,
-      duration: audio.duration || null // Ensure duration is never undefined
-    };
-    this.audios.set(id, newAudio);
-    return newAudio;
+    const result = await db.insert(audios).values(audio).returning();
+    return result[0];
   }
   
   async getAudio(id: number): Promise<Audio | undefined> {
-    return this.audios.get(id);
+    const result = await db.select().from(audios).where(eq(audios.id, id));
+    return result[0];
   }
   
   async getAudioByProjectId(projectId: string): Promise<Audio | undefined> {
-    return Array.from(this.audios.values()).find(
-      (audio) => audio.projectId === projectId
-    );
+    const result = await db
+      .select()
+      .from(audios)
+      .where(eq(audios.projectId, projectId))
+      .orderBy(desc(audios.createdAt));
+    
+    return result[0];
   }
   
   // Video methods
   async createVideo(video: InsertVideo): Promise<Video> {
-    const id = this.videoId++;
-    const newVideo: Video = { 
-      ...video, 
-      id,
-      photoIds: video.photoIds || null,
-      uploadedVideoId: video.uploadedVideoId || null,
-      backgroundMusicId: video.backgroundMusicId || null,
-      backgroundMusicVolume: video.backgroundMusicVolume || "0.2",
-      duration: video.duration || null // Ensure duration is never undefined
-    };
-    this.videos.set(id, newVideo);
-    return newVideo;
+    const result = await db.insert(videos).values(video).returning();
+    return result[0];
   }
   
   async getVideo(id: number): Promise<Video | undefined> {
-    return this.videos.get(id);
+    const result = await db.select().from(videos).where(eq(videos.id, id));
+    return result[0];
   }
   
   async getVideoByProjectId(projectId: string): Promise<Video | undefined> {
-    return Array.from(this.videos.values()).find(
-      (video) => video.projectId === projectId
-    );
+    const result = await db
+      .select()
+      .from(videos)
+      .where(eq(videos.projectId, projectId))
+      .orderBy(desc(videos.createdAt));
+    
+    return result[0];
   }
   
-  // User Preferences methods
+  async getVideosByProjectId(projectId: string): Promise<Video[]> {
+    return await db
+      .select()
+      .from(videos)
+      .where(eq(videos.projectId, projectId))
+      .orderBy(desc(videos.createdAt));
+  }
+  
+  // Legacy User Preferences methods
   async getFavoriteVoice(): Promise<UserPreferences | undefined> {
-    return this.userPreferences;
+    const result = await db.select().from(userPreferences);
+    return result[0];
   }
   
   async saveFavoriteVoice(preferences: InsertUserPreferences): Promise<UserPreferences> {
-    const id = this.preferenceId++;
-    const newPreferences: UserPreferences = { ...preferences, id };
-    this.userPreferences = newPreferences;
-    return newPreferences;
+    const result = await db.insert(userPreferences).values(preferences).returning();
+    return result[0];
   }
   
   async updateFavoriteVoice(preferences: InsertUserPreferences): Promise<UserPreferences> {
-    if (!this.userPreferences) {
-      return this.saveFavoriteVoice(preferences);
+    // Obtener el ID existente
+    const existingPref = await this.getFavoriteVoice();
+    if (!existingPref) {
+      throw new Error("No favorite voice found to update");
     }
     
-    const updatedPreferences: UserPreferences = { 
-      ...preferences, 
-      id: this.userPreferences.id 
-    };
+    const result = await db
+      .update(userPreferences)
+      .set(preferences)
+      .where(eq(userPreferences.id, existingPref.id))
+      .returning();
     
-    this.userPreferences = updatedPreferences;
-    return updatedPreferences;
+    return result[0];
   }
   
   // Saved Voices methods
   async getSavedVoices(): Promise<SavedVoice[]> {
-    return Array.from(this.savedVoices.values());
+    return await db.select().from(savedVoices).orderBy(savedVoices.position);
   }
   
   async getSavedVoice(id: number): Promise<SavedVoice | undefined> {
-    return this.savedVoices.get(id);
+    const result = await db.select().from(savedVoices).where(eq(savedVoices.id, id));
+    return result[0];
   }
   
   async getSavedVoiceByPosition(position: number): Promise<SavedVoice | undefined> {
-    return Array.from(this.savedVoices.values()).find(
-      voice => voice.position === position
-    );
+    const result = await db.select().from(savedVoices).where(eq(savedVoices.position, position));
+    return result[0];
   }
   
   async getDefaultSavedVoice(): Promise<SavedVoice | undefined> {
-    return Array.from(this.savedVoices.values()).find(
-      voice => voice.isDefault === true
-    );
+    const result = await db.select().from(savedVoices).where(eq(savedVoices.isDefault, true));
+    return result[0];
   }
   
   async saveSavedVoice(voice: InsertSavedVoice): Promise<SavedVoice> {
-    const id = this.savedVoiceId++;
-    
-    // Asegurarse de que todos los campos requeridos estén presentes
-    const newVoice: SavedVoice = { 
-      ...voice, 
-      id,
-      position: voice.position ?? 0,
-      displayName: voice.displayName ?? null,
-      isDefault: voice.isDefault ?? false
-    };
-    
-    // Si es marcada como default, actualizar cualquier otra voz default a false
-    if (newVoice.isDefault) {
-      for (const [voiceId, existingVoice] of Array.from(this.savedVoices.entries())) {
-        if (existingVoice.isDefault && voiceId !== id) {
-          this.savedVoices.set(voiceId, { ...existingVoice, isDefault: false });
-        }
-      }
-    }
-    
-    // Asegurarse que no haya duplicados en la misma posición
-    for (const [voiceId, existingVoice] of Array.from(this.savedVoices.entries())) {
-      if (existingVoice.position === newVoice.position && voiceId !== id) {
-        // Mover la voz existente a otra posición
-        const newPosition = (existingVoice.position + 1) % 3;
-        this.savedVoices.set(voiceId, { ...existingVoice, position: newPosition });
-      }
-    }
-    
-    this.savedVoices.set(id, newVoice);
-    return newVoice;
+    const result = await db.insert(savedVoices).values(voice).returning();
+    return result[0];
   }
   
   async updateSavedVoice(id: number, voice: Partial<InsertSavedVoice>): Promise<SavedVoice> {
-    const existingVoice = this.savedVoices.get(id);
-    if (!existingVoice) {
-      throw new Error(`Voice with id ${id} not found`);
-    }
+    const result = await db
+      .update(savedVoices)
+      .set(voice)
+      .where(eq(savedVoices.id, id))
+      .returning();
     
-    // Si se actualiza a default, actualizar cualquier otra voz default a false
-    if (voice.isDefault) {
-      for (const [voiceId, otherVoice] of Array.from(this.savedVoices.entries())) {
-        if (otherVoice.isDefault && voiceId !== id) {
-          this.savedVoices.set(voiceId, { ...otherVoice, isDefault: false });
-        }
-      }
-    }
-    
-    // Asegurarse que no haya duplicados en la misma posición
-    if (typeof voice.position === 'number' && voice.position !== existingVoice.position) {
-      for (const [voiceId, otherVoice] of Array.from(this.savedVoices.entries())) {
-        if (otherVoice.position === voice.position && voiceId !== id) {
-          // Mover la otra voz a la posición de la voz actual
-          this.savedVoices.set(voiceId, { ...otherVoice, position: existingVoice.position });
-        }
-      }
-    }
-    
-    const updatedVoice: SavedVoice = { ...existingVoice, ...voice };
-    this.savedVoices.set(id, updatedVoice);
-    return updatedVoice;
+    return result[0];
   }
   
   async deleteSavedVoice(id: number): Promise<boolean> {
-    return this.savedVoices.delete(id);
+    const result = await db
+      .delete(savedVoices)
+      .where(eq(savedVoices.id, id))
+      .returning({ id: savedVoices.id });
+    
+    return result.length > 0;
   }
   
   // Logo methods
   async getLogos(): Promise<Logo[]> {
-    return Array.from(this.logos.values());
+    return await db.select().from(logos);
   }
   
   async getLogo(id: number): Promise<Logo | undefined> {
-    return this.logos.get(id);
+    const result = await db.select().from(logos).where(eq(logos.id, id));
+    return result[0];
   }
   
   async createLogo(logo: InsertLogo): Promise<Logo> {
-    const id = this.logoId++;
-    const newLogo: Logo = { ...logo, id };
-    this.logos.set(id, newLogo);
-    return newLogo;
+    const result = await db.insert(logos).values(logo).returning();
+    return result[0];
   }
   
   async deleteLogo(id: number): Promise<boolean> {
-    return this.logos.delete(id);
+    const result = await db
+      .delete(logos)
+      .where(eq(logos.id, id))
+      .returning({ id: logos.id });
+    
+    return result.length > 0;
   }
   
   // Saved Logos methods
   async getSavedLogos(): Promise<SavedLogo[]> {
-    return Array.from(this.savedLogos.values());
+    return await db.select().from(savedLogos).orderBy(savedLogos.position);
   }
   
   async getSavedLogo(id: number): Promise<SavedLogo | undefined> {
-    return this.savedLogos.get(id);
+    const result = await db.select().from(savedLogos).where(eq(savedLogos.id, id));
+    return result[0];
   }
   
   async getSavedLogoByPosition(position: number): Promise<SavedLogo | undefined> {
-    return Array.from(this.savedLogos.values()).find(
-      logo => logo.position === position
-    );
+    const result = await db.select().from(savedLogos).where(eq(savedLogos.position, position));
+    return result[0];
   }
   
   async getDefaultSavedLogo(): Promise<SavedLogo | undefined> {
-    return Array.from(this.savedLogos.values()).find(
-      logo => logo.isDefault === true
-    );
+    const result = await db.select().from(savedLogos).where(eq(savedLogos.isDefault, true));
+    return result[0];
   }
   
-  async saveSavedLogo(savedLogo: InsertSavedLogo): Promise<SavedLogo> {
-    const id = this.savedLogoId++;
-    
-    // Asegurarse de que todos los campos requeridos estén presentes
-    const newLogo: SavedLogo = { 
-      ...savedLogo, 
-      id,
-      position: savedLogo.position ?? 0,
-      isDefault: savedLogo.isDefault ?? false
-    };
-    
-    // Si es marcado como default, actualizar cualquier otro logo default a false
-    if (newLogo.isDefault) {
-      for (const [logoId, existingLogo] of Array.from(this.savedLogos.entries())) {
-        if (existingLogo.isDefault && logoId !== id) {
-          this.savedLogos.set(logoId, { ...existingLogo, isDefault: false });
-        }
-      }
-    }
-    
-    // Asegurarse que no haya duplicados en la misma posición
-    for (const [logoId, existingLogo] of Array.from(this.savedLogos.entries())) {
-      if (existingLogo.position === newLogo.position && logoId !== id) {
-        // Mover el logo existente a otra posición
-        const newPosition = (existingLogo.position + 1) % 3;
-        this.savedLogos.set(logoId, { ...existingLogo, position: newPosition });
-      }
-    }
-    
-    this.savedLogos.set(id, newLogo);
-    return newLogo;
+  async saveSavedLogo(logo: InsertSavedLogo): Promise<SavedLogo> {
+    const result = await db.insert(savedLogos).values(logo).returning();
+    return result[0];
   }
   
-  async updateSavedLogo(id: number, savedLogo: Partial<InsertSavedLogo>): Promise<SavedLogo> {
-    const existingLogo = this.savedLogos.get(id);
-    if (!existingLogo) {
-      throw new Error(`Logo with id ${id} not found`);
-    }
+  async updateSavedLogo(id: number, logo: Partial<InsertSavedLogo>): Promise<SavedLogo> {
+    const result = await db
+      .update(savedLogos)
+      .set(logo)
+      .where(eq(savedLogos.id, id))
+      .returning();
     
-    // Si se actualiza a default, actualizar cualquier otro logo default a false
-    if (savedLogo.isDefault) {
-      for (const [logoId, otherLogo] of Array.from(this.savedLogos.entries())) {
-        if (otherLogo.isDefault && logoId !== id) {
-          this.savedLogos.set(logoId, { ...otherLogo, isDefault: false });
-        }
-      }
-    }
-    
-    // Asegurarse que no haya duplicados en la misma posición
-    if (typeof savedLogo.position === 'number' && savedLogo.position !== existingLogo.position) {
-      for (const [logoId, otherLogo] of Array.from(this.savedLogos.entries())) {
-        if (otherLogo.position === savedLogo.position && logoId !== id) {
-          // Mover el otro logo a la posición del logo actual
-          this.savedLogos.set(logoId, { ...otherLogo, position: existingLogo.position });
-        }
-      }
-    }
-    
-    const updatedLogo: SavedLogo = { ...existingLogo, ...savedLogo };
-    this.savedLogos.set(id, updatedLogo);
-    return updatedLogo;
+    return result[0];
   }
   
   async deleteSavedLogo(id: number): Promise<boolean> {
-    return this.savedLogos.delete(id);
+    const result = await db
+      .delete(savedLogos)
+      .where(eq(savedLogos.id, id))
+      .returning({ id: savedLogos.id });
+    
+    return result.length > 0;
   }
   
   // App Settings methods
   async getAppSettings(): Promise<AppSettings | undefined> {
-    return this.appSettings;
+    const result = await db.select().from(appSettings);
+    return result[0];
   }
   
   async saveAppSettings(settings: InsertAppSettings): Promise<AppSettings> {
-    const id = this.appSettingsId++;
-    
-    // Asegurarse que todos los campos requeridos estén presentes con valores por defecto
-    const newSettings: AppSettings = { 
-      ...settings, 
-      id,
-      selectedLogoId: settings.selectedLogoId ?? 1,
-      logoPosition: settings.logoPosition ?? "top-right",
-      showTitle: settings.showTitle ?? true,
-      titleText: settings.titleText ?? "",  // Asegurarse de que titleText nunca sea undefined
-      titleFontSize: settings.titleFontSize ?? 32,
-      titleColor: settings.titleColor ?? "#ffffff",
-      titlePosition: settings.titlePosition ?? "top-center"
-    };
-    
-    this.appSettings = newSettings;
-    return newSettings;
+    const result = await db.insert(appSettings).values(settings).returning();
+    return result[0];
   }
   
   async updateAppSettings(settings: Partial<InsertAppSettings>): Promise<AppSettings> {
-    if (!this.appSettings) {
-      return this.saveAppSettings({
-        selectedLogoId: settings.selectedLogoId ?? 1,
-        logoPosition: settings.logoPosition ?? "top-right", 
-        showTitle: settings.showTitle ?? true,
-        titleText: settings.titleText ?? "",  // Asegurarse de que titleText nunca sea undefined
-        titleFontSize: settings.titleFontSize ?? 32,
-        titleColor: settings.titleColor ?? "#ffffff",
-        titlePosition: settings.titlePosition ?? "top-center",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
+    // Obtener el ID existente
+    const existingSettings = await this.getAppSettings();
+    if (!existingSettings) {
+      throw new Error("No app settings found to update");
     }
     
-    const updatedSettings: AppSettings = { 
-      ...this.appSettings, 
-      ...settings,
-      updatedAt: settings.updatedAt ?? new Date().toISOString()
-    };
+    const result = await db
+      .update(appSettings)
+      .set(settings)
+      .where(eq(appSettings.id, existingSettings.id))
+      .returning();
     
-    this.appSettings = updatedSettings;
-    return updatedSettings;
+    return result[0];
   }
   
   // Background Music methods
   async getBackgroundMusic(): Promise<BackgroundMusic[]> {
-    return Array.from(this.backgroundMusics.values());
+    return await db.select().from(backgroundMusic);
   }
   
   async getBackgroundMusicById(id: number): Promise<BackgroundMusic | undefined> {
-    return this.backgroundMusics.get(id);
+    const result = await db.select().from(backgroundMusic).where(eq(backgroundMusic.id, id));
+    return result[0];
   }
   
   async createBackgroundMusic(music: InsertBackgroundMusic): Promise<BackgroundMusic> {
-    const id = this.backgroundMusicId++;
-    const newMusic: BackgroundMusic = { 
-      ...music, 
-      id,
-      duration: music.duration || null
-    };
-    this.backgroundMusics.set(id, newMusic);
-    return newMusic;
+    const result = await db.insert(backgroundMusic).values(music).returning();
+    return result[0];
   }
   
   async deleteBackgroundMusic(id: number): Promise<boolean> {
-    return this.backgroundMusics.delete(id);
+    const result = await db
+      .delete(backgroundMusic)
+      .where(eq(backgroundMusic.id, id))
+      .returning({ id: backgroundMusic.id });
+    
+    return result.length > 0;
   }
   
   // Uploaded Video methods
   async createUploadedVideo(video: InsertUploadedVideo): Promise<UploadedVideo> {
-    const id = this.uploadedVideoId++;
-    const newVideo: UploadedVideo = { 
-      ...video, 
-      id,
-      duration: video.duration || null
-    };
-    this.uploadedVideos.set(id, newVideo);
-    return newVideo;
+    const result = await db.insert(uploadedVideos).values(video).returning();
+    return result[0];
   }
   
   async getUploadedVideo(id: number): Promise<UploadedVideo | undefined> {
-    return this.uploadedVideos.get(id);
+    const result = await db.select().from(uploadedVideos).where(eq(uploadedVideos.id, id));
+    return result[0];
   }
   
   async getUploadedVideosByProjectId(projectId: string): Promise<UploadedVideo[]> {
-    return Array.from(this.uploadedVideos.values()).filter(
-      (video) => video.projectId === projectId
-    );
+    return await db
+      .select()
+      .from(uploadedVideos)
+      .where(eq(uploadedVideos.projectId, projectId));
   }
   
   async deleteUploadedVideo(id: number): Promise<boolean> {
-    return this.uploadedVideos.delete(id);
+    const result = await db
+      .delete(uploadedVideos)
+      .where(eq(uploadedVideos.id, id))
+      .returning({ id: uploadedVideos.id });
+    
+    return result.length > 0;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

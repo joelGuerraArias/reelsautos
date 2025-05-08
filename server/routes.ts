@@ -1160,13 +1160,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
           // Separamos el textOverlay en una variable diferente para mejorar la estructura del comando
           const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
-          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[2:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -map 1:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+          // Agregamos optimizaciones de rendimiento: preset ultrafast, threads
+          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1:1[base];[2:v]scale=-1:64,setsar=1:1[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -map 1:a -c:v libx264 -preset ultrafast -threads 0 -c:a aac -b:a 192k -pix_fmt yuv420p -r 30 -shortest "${outputPath}"`;
         } else {
           // Sin logo, solo aplicamos texto si es necesario
           // Usamos scale=increase para llenar completamente el marco y crop para mantener proporciones
-          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720${textOverlay}" -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+          command = `ffmpeg -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1:1${textOverlay}" -c:v libx264 -preset ultrafast -threads 0 -c:a aac -b:a 192k -pix_fmt yuv420p -r 30 -shortest "${outputPath}"`;
         }
         
+        console.log("Generando video con una sola foto (modo optimizado)");
         await exec(command);
       } else if (photos.length > 1) {
         // Para múltiples fotos, crear un slideshow con duración igual para cada foto
@@ -1185,8 +1187,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Añadir input de foto
             inputArgs += ` -loop 1 -t ${photoDuration} -i "${photo.filepath}"`;
             
-            // Escalar y recortar la imagen a 1280x720
-            filterComplex.push(`[${i}:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[v${i}]`);
+            // Escalar y recortar la imagen a 1280x720 con setsar para compatibilidad
+            filterComplex.push(`[${i}:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1:1[v${i}]`);
             
             // Añadir al array de "named" streams
             photoFilters.push(`[v${i}]`);
@@ -1224,7 +1226,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Corregir el índice del audio para el mapeo
         const audioIndex = photos.length + (hasLogo ? 1 : 0);
         // Asegurar que usamos el formato correcto para el -map
-        let command = `ffmpeg${inputArgs} -i "${audio.filepath}" -filter_complex "${allFilters}" -map "[outv]" -map ${audioIndex}:a -c:v libx264 -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${outputPath}"`;
+        // Agregamos optimizaciones de rendimiento: preset ultrafast, threads
+        let command = `ffmpeg${inputArgs} -i "${audio.filepath}" -filter_complex "${allFilters}" -map "[outv]" -map ${audioIndex}:a -c:v libx264 -preset ultrafast -threads 0 -c:a aac -b:a 192k -pix_fmt yuv420p -r 30 -shortest "${outputPath}"`;
         
         console.log("Comando FFmpeg optimizado:", command);
         
@@ -1243,7 +1246,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (photo && photo.filepath) {
               // Crear un segmento de imagen estática con overlay básico
               const tempOutput = path.join(tempDir, `temp_${i}.mp4`);
-              const basicCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`;
+              // Usar preset ultrafast para acelerar la codificación
+              const basicCommand = `ffmpeg -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1:1" -c:v libx264 -preset ultrafast -threads 0 -pix_fmt yuv420p -r 30 "${tempOutput}"`;
               
               await exec(basicCommand);
               concatContent.push(tempOutput);

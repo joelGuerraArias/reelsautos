@@ -1314,24 +1314,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const videoTempPath = path.join(tempDir, `temp_video_${i}_${nanoid()}.mp4`);
           
           // Procesar el video para aplicar logo y texto
+          // Usar parámetros consistentes para todos los videos: mismo SAR, framerate, etc.
           if (hasLogo) {
             // Si hay logo, usamos filtergraph complejo
             // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
             const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
             // Usar comillas dobles para escapar el texto dentro del comando FFmpeg
-            const processVideoCommand = `ffmpeg -i "${currentVideo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[base];[1:v]scale=-1:64[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -c:v libx264 -pix_fmt yuv420p -shortest "${videoTempPath}"`;
-            console.log(`Aplicando logo y texto al video ${i+1}`);
+            // Añadimos flags para asegurar compatibilidad entre videos
+            const processVideoCommand = `ffmpeg -i "${currentVideo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1:1[base];[1:v]scale=-1:64,setsar=1:1[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -c:v libx264 -preset ultrafast -threads 0 -pix_fmt yuv420p -r 30 -vsync cfr "${videoTempPath}"`;
+            console.log(`Aplicando logo y texto al video ${i+1} con parámetros estandarizados`);
             await exec(processVideoCommand);
           } else {
             // Sin logo, solo aplicamos texto si es necesario
             if (textOverlay) {
               const drawTextFilter = textOverlay.replace(/^,/, '');
-              const processVideoCommand = `ffmpeg -i "${currentVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,${drawTextFilter}" -c:v libx264 -pix_fmt yuv420p "${videoTempPath}"`;
-              console.log(`Aplicando texto al video ${i+1}`);
+              const processVideoCommand = `ffmpeg -i "${currentVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1:1,${drawTextFilter}" -c:v libx264 -preset ultrafast -threads 0 -pix_fmt yuv420p -r 30 -vsync cfr "${videoTempPath}"`;
+              console.log(`Aplicando texto al video ${i+1} con parámetros estandarizados`);
               await exec(processVideoCommand);
             } else {
-              const processVideoCommand = `ffmpeg -i "${currentVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720" -c:v libx264 -pix_fmt yuv420p "${videoTempPath}"`;
-              console.log(`Escalando video ${i+1}`);
+              const processVideoCommand = `ffmpeg -i "${currentVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1:1" -c:v libx264 -preset ultrafast -threads 0 -pix_fmt yuv420p -r 30 -vsync cfr "${videoTempPath}"`;
+              console.log(`Escalando video ${i+1} con parámetros estandarizados`);
               await exec(processVideoCommand);
             }
           }
@@ -1379,9 +1381,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const concatFileContent = processedVideos.map(video => `file '${video.replace(/'/g, "'\\''")}'\n`).join('');
           fs.writeFileSync(concatFilePath, concatFileContent);
           
-          // Concatenar videos
+          // Concatenar videos - en lugar de usar copy, recodificamos para asegurar compatibilidad
           const concatOutputPath = path.join(tempDir, `concat_output_${nanoid()}.mp4`);
-          const concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c copy "${concatOutputPath}"`;
+          const concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c:v libx264 -preset ultrafast -pix_fmt yuv420p -r 30 -vsync 1 -strict -2 "${concatOutputPath}"`;
+          console.log("Ejecutando comando de concatenación con recodificación para compatibilidad...");
           await exec(concatCommand);
           
           // Ahora combinar el video concatenado con el audio

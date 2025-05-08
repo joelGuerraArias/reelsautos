@@ -60,11 +60,14 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = 5000;
+  // Aumentar el timeout para evitar errores 504 Gateway Timeout durante generación de videos
+  server.timeout = 600000; // 10 minutos (600000 ms)
+  
   server.listen({
     port,
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
-    log(`serving on port ${port}`);
+    log(`serving on port ${port} with increased timeout (10 minutes)`);
   });
 })();

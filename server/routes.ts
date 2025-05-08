@@ -1260,12 +1260,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const concatListContent = concatContent.map(file => `file '${file}'`).join('\n');
             fs.writeFileSync(concatFilePath, concatListContent);
             
-            // Crear output file sin audio
+            // Crear output file sin audio - utilizando recodificación para mayor compatibilidad
             const tempVideoOutput = path.join(tempDir, 'temp_video_output.mp4');
-            const concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c copy "${tempVideoOutput}"`;
+            // En lugar de usar copy, recodificamos con parámetros optimizados para asegurar compatibilidad
+            const concatCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c:v libx264 -preset ultrafast -threads 0 -pix_fmt yuv420p -r 30 -vsync 1 "${tempVideoOutput}"`;
+            console.log("Usando método alternativo con recodificación para asegurar compatibilidad");
             await exec(concatCommand);
             
             // Añadir audio al video final
+            console.log("Combinando video con audio");
             const finalCommand = `ffmpeg -i "${tempVideoOutput}" -i "${audio.filepath}" -c:v copy -c:a aac -b:a 192k -shortest "${outputPath}"`;
             await exec(finalCommand);
             

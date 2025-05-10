@@ -1419,23 +1419,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await exec(concatCommand);
           
           // Ahora combinar el video concatenado con el audio
-          if (backgroundMusic && backgroundMusic.filepath) {
-            // Si hay música de fondo, mezclamos el audio principal con la música
+          if (backgroundMusic && backgroundMusic.filepath && fs.existsSync(backgroundMusic.filepath)) {
+            // Si hay música de fondo y el archivo existe, mezclamos el audio principal con la música
             const musicVolume = backgroundMusicVolume || 0.2; // Valor por defecto
             
             // Crear un archivo temporal para la mezcla de audio
             const mixedAudioPath = path.join(tempDir, `mixed_audio_${nanoid()}.mp3`);
             
+            console.log(`Mezclando audio principal con música de fondo para videos múltiples: ${backgroundMusic.filepath}`);
             // Mezclar el audio principal con la música de fondo
             const mixAudioCommand = `ffmpeg -i "${audio.filepath}" -i "${backgroundMusic.filepath}" -filter_complex "[0:a]volume=1.0[a1];[1:a]volume=${musicVolume}[a2];[a1][a2]amix=inputs=2:duration=longest[aout]" -map "[aout]" "${mixedAudioPath}"`;
-            await exec(mixAudioCommand);
             
-            // Combinar el video concatenado con el audio mezclado
-            const finalCommand = `ffmpeg -i "${concatOutputPath}" -i "${mixedAudioPath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;
-            await exec(finalCommand);
-            
-            // Limpiar el archivo de audio mezclado
-            fs.unlinkSync(mixedAudioPath);
+            try {
+              await exec(mixAudioCommand);
+              
+              // Combinar el video concatenado con el audio mezclado
+              const finalCommand = `ffmpeg -i "${concatOutputPath}" -i "${mixedAudioPath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;
+              await exec(finalCommand);
+              
+              // Limpiar el archivo de audio mezclado
+              if (fs.existsSync(mixedAudioPath)) {
+                fs.unlinkSync(mixedAudioPath);
+              }
+            } catch (error) {
+              console.error("Error al mezclar audio con música de fondo para videos múltiples:", error);
+              // Si hay error con la música de fondo, usar solo el audio principal
+              console.log("Usando solo audio principal debido a error con música de fondo");
+              const finalCommand = `ffmpeg -i "${concatOutputPath}" -i "${audio.filepath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;
+              await exec(finalCommand);
+            }
           } else {
             // Sin música de fondo, solo combinamos con el audio principal
             const finalCommand = `ffmpeg -i "${concatOutputPath}" -i "${audio.filepath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;

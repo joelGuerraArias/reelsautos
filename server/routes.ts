@@ -998,9 +998,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const outputFilename = `video_${nanoid()}.mp4`;
       const outputPath = path.join(VIDEO_DIR, outputFilename);
       
-      // Obtener la música de fondo si se especificó
+      // Obtener la música de fondo - si se especificó usamos esa, si no, buscamos una automáticamente
       let backgroundMusic = null;
+      // Variable para el volumen de la música de fondo, por defecto 0.2 (20%)
+      // Usamos una variable diferente para evitar conflictos con backgroundMusicVolume de validatedData
+      let musicVolumeToUse = 0.2;
+      
       if (backgroundMusicId) {
+        // Si el usuario especificó una música, intentamos obtenerla
         try {
           backgroundMusic = await storage.getBackgroundMusicById(backgroundMusicId);
           
@@ -1009,6 +1014,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (!fs.existsSync(backgroundMusic.filepath)) {
               console.error(`El archivo de música de fondo no existe en la ruta: ${backgroundMusic.filepath}`);
               backgroundMusic = null; // Si el archivo no existe, no lo usamos
+            } else if (validatedData.backgroundMusicVolume) {
+              // Si el usuario especificó un volumen, lo utilizamos
+              musicVolumeToUse = parseFloat(validatedData.backgroundMusicVolume) || 0.2;
             }
           } else {
             console.warn(`Música de fondo con ID ${backgroundMusicId} no encontrada o ruta no válida`);
@@ -1017,6 +1025,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (error) {
           console.error(`Error al obtener música de fondo con ID ${backgroundMusicId}:`, error);
           backgroundMusic = null; // En caso de error, continuamos sin música de fondo
+        }
+      } else {
+        // Si no hay música de fondo especificada, buscamos la primera disponible
+        try {
+          console.log("Buscando música de fondo automáticamente...");
+          const availableMusic = await storage.getBackgroundMusic();
+          
+          if (availableMusic && availableMusic.length > 0) {
+            // Tomar la primera música disponible
+            const firstMusic = availableMusic[0];
+            if (firstMusic && firstMusic.filepath && fs.existsSync(firstMusic.filepath)) {
+              console.log(`Usando música de fondo automática: ${firstMusic.filename}`);
+              backgroundMusic = firstMusic;
+              // Usar volumen por defecto 0.2 (20%)
+            } else {
+              console.warn("Se encontró música pero el archivo no existe");
+            }
+          } else {
+            console.log("No hay música de fondo disponible");
+          }
+        } catch (error) {
+          console.error("Error al buscar música de fondo automáticamente:", error);
         }
       }
       
@@ -1372,14 +1402,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Combinar el único video procesado con el audio
           if (backgroundMusic && backgroundMusic.filepath && fs.existsSync(backgroundMusic.filepath)) {
             // Si hay música de fondo y el archivo existe, mezclamos el audio principal con la música
-            const musicVolume = backgroundMusicVolume || 0.2; // Valor por defecto
+            // Variable backgroundMusicVolume ya está inicializada con el valor (0.2 por defecto)
             
             // Crear un archivo temporal para la mezcla de audio
             const mixedAudioPath = path.join(tempDir, `mixed_audio_${nanoid()}.mp3`);
             
-            console.log(`Mezclando audio principal con música de fondo: ${backgroundMusic.filepath}`);
+            console.log(`Mezclando audio principal con música de fondo: ${backgroundMusic.filepath}, volumen: ${musicVolumeToUse * 100}%`);
             // Mezclar el audio principal con la música de fondo
-            const mixAudioCommand = `ffmpeg -i "${audio.filepath}" -i "${backgroundMusic.filepath}" -filter_complex "[0:a]volume=1.0[a1];[1:a]volume=${musicVolume}[a2];[a1][a2]amix=inputs=2:duration=longest[aout]" -map "[aout]" "${mixedAudioPath}"`;
+            const mixAudioCommand = `ffmpeg -i "${audio.filepath}" -i "${backgroundMusic.filepath}" -filter_complex "[0:a]volume=1.0[a1];[1:a]volume=${musicVolumeToUse}[a2];[a1][a2]amix=inputs=2:duration=longest[aout]" -map "[aout]" "${mixedAudioPath}"`;
             try {
               await exec(mixAudioCommand);
               

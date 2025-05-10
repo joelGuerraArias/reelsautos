@@ -988,10 +988,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Obtener la música de fondo - si se especificó usamos esa, si no, buscamos una automáticamente
       let backgroundMusic = null;
-      // Variable para el volumen de la música de fondo, por defecto 1.0 (100%)
-      // Aumentamos el volumen al máximo para asegurarnos de que se escuche la música
+      // Variable para el volumen de la música de fondo, por defecto 0.4 (40%)
+      // Lo dejamos en 40% según la preferencia del usuario
       // Usamos una variable diferente para evitar conflictos con backgroundMusicVolume de validatedData
-      let musicVolumeToUse = 1.0;
+      let musicVolumeToUse = 0.4;
       
       if (backgroundMusicId) {
         // Si el usuario especificó una música, intentamos obtenerla
@@ -1176,41 +1176,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             fontSize = 20; // Para textos muy largos, reducir más
           }
           
-          // Dividir el texto en múltiples líneas si es muy largo y no tiene saltos de línea
-          if (textLength > 50 && !titleText.includes('\\n')) {
-            // Insertar saltos de línea cada ~40 caracteres en espacios
-            const words = titleText.split(' ');
-            let newText = '';
-            let lineLength = 0;
-            
-            for (const word of words) {
-              if (lineLength + word.length + 1 > 40) {
-                newText += '\\n' + word + ' ';
-                lineLength = word.length + 1;
-              } else {
-                newText += word + ' ';
-                lineLength += word.length + 1;
-              }
-            }
-            
-            titleText = newText.trim();
-            console.log("Texto con saltos de línea automáticos:", JSON.stringify(titleText));
-          }
-          
-          // Escapar comillas simples y dobles
-          const escapedText = titleText.replace(/'/g, "'\\''").replace(/"/g, '\\"');
-        
-          // Título con fondo negro que solo cubre el texto
-          // Perfectamente centrado horizontal y verticalmente
-          const textX = '(w-tw)/2'; // Centrado horizontal exacto
-          const textY = 'h-th-150'; // Posición a 150px del borde inferior
-          
-          // Estilo con fondo negro que solo cubre el texto y permite textos largos
-          // Aumentamos el boxborderw y reducimos el tamaño de fuente para textos largos
-          const boxBorderWidth = 8; // Mayor borde para mejor visibilidad
-          
-          // Para texto largo, forzamos saltos de línea para asegurar que se vea completo
-          if (titleText.length > 40 && !titleText.includes("\\n")) {
+          // Mejorado: Dividir el texto en DOS líneas si es largo y no tiene saltos de línea
+          // Esto garantiza que el texto esté bien distribuido y se vea completo
+          if (textLength > 40 && !titleText.includes('\\n')) {
             // Dividir el texto en 2 líneas si es largo
             const mitad = Math.ceil(titleText.length / 2);
             let primeraMitad = titleText.substring(0, mitad);
@@ -1224,12 +1192,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             
             // Nuevo texto con salto de línea forzado
-            const nuevoTexto = `${primeraMitad}\\n${segundaMitad}`;
-            console.log("Texto dividido en dos líneas:", nuevoTexto);
-            
-            // IMPORTANTE: creamos un nuevo texto escapado con el salto de línea
-            escapedText = nuevoTexto.replace(/'/g, "'\\''").replace(/"/g, '\\"');
+            titleText = `${primeraMitad}\\n${segundaMitad}`;
+            console.log("Texto dividido en dos líneas:", titleText);
           }
+          
+          // Escapar comillas simples y dobles
+          const escapedText = titleText.replace(/'/g, "'\\''").replace(/"/g, '\\"');
+        
+          // Título con fondo negro que solo cubre el texto
+          // Perfectamente centrado horizontal y verticalmente
+          const textX = '(w-tw)/2'; // Centrado horizontal exacto
+          const textY = 'h-th-150'; // Posición a 150px del borde inferior
+          
+          // Estilo con fondo negro que solo cubre el texto y permite textos largos
+          // Aumentamos el boxborderw y reducimos el tamaño de fuente para textos largos
+          const boxBorderWidth = 8; // Mayor borde para mejor visibilidad
           
           textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${escapedText}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=black@0.8:boxborderw=${boxBorderWidth}:line_spacing=15:borderw=1`;
           

@@ -1001,9 +1001,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Obtener la música de fondo si se especificó
       let backgroundMusic = null;
       if (backgroundMusicId) {
-        backgroundMusic = await storage.getBackgroundMusicById(backgroundMusicId);
-        if (!backgroundMusic) {
-          console.warn(`Música de fondo con ID ${backgroundMusicId} no encontrada`);
+        try {
+          backgroundMusic = await storage.getBackgroundMusicById(backgroundMusicId);
+          
+          // Verificar que el archivo de música existe
+          if (backgroundMusic && backgroundMusic.filepath) {
+            if (!fs.existsSync(backgroundMusic.filepath)) {
+              console.error(`El archivo de música de fondo no existe en la ruta: ${backgroundMusic.filepath}`);
+              backgroundMusic = null; // Si el archivo no existe, no lo usamos
+            }
+          } else {
+            console.warn(`Música de fondo con ID ${backgroundMusicId} no encontrada o ruta no válida`);
+            backgroundMusic = null;
+          }
+        } catch (error) {
+          console.error(`Error al obtener música de fondo con ID ${backgroundMusicId}:`, error);
+          backgroundMusic = null; // En caso de error, continuamos sin música de fondo
         }
       }
       
@@ -1357,23 +1370,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Si solo hay un video procesado
         if (processedVideos.length === 1) {
           // Combinar el único video procesado con el audio
-          if (backgroundMusic && backgroundMusic.filepath) {
-            // Si hay música de fondo, mezclamos el audio principal con la música
+          if (backgroundMusic && backgroundMusic.filepath && fs.existsSync(backgroundMusic.filepath)) {
+            // Si hay música de fondo y el archivo existe, mezclamos el audio principal con la música
             const musicVolume = backgroundMusicVolume || 0.2; // Valor por defecto
             
             // Crear un archivo temporal para la mezcla de audio
             const mixedAudioPath = path.join(tempDir, `mixed_audio_${nanoid()}.mp3`);
             
+            console.log(`Mezclando audio principal con música de fondo: ${backgroundMusic.filepath}`);
             // Mezclar el audio principal con la música de fondo
             const mixAudioCommand = `ffmpeg -i "${audio.filepath}" -i "${backgroundMusic.filepath}" -filter_complex "[0:a]volume=1.0[a1];[1:a]volume=${musicVolume}[a2];[a1][a2]amix=inputs=2:duration=longest[aout]" -map "[aout]" "${mixedAudioPath}"`;
-            await exec(mixAudioCommand);
-            
-            // Combinar el video procesado con el audio mezclado
-            const command = `ffmpeg -i "${processedVideos[0]}" -i "${mixedAudioPath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;
-            await exec(command);
-            
-            // Limpiar el archivo de audio mezclado
-            fs.unlinkSync(mixedAudioPath);
+            try {
+              await exec(mixAudioCommand);
+              
+              // Combinar el video procesado con el audio mezclado
+              const command = `ffmpeg -i "${processedVideos[0]}" -i "${mixedAudioPath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;
+              await exec(command);
+              
+              // Limpiar el archivo de audio mezclado
+              if (fs.existsSync(mixedAudioPath)) {
+                fs.unlinkSync(mixedAudioPath);
+              }
+            } catch (error) {
+              console.error("Error al mezclar audio con música de fondo:", error);
+              // Si hay error con la música de fondo, usar solo el audio principal
+              console.log("Usando solo audio principal debido a error con música de fondo");
+              const command = `ffmpeg -i "${processedVideos[0]}" -i "${audio.filepath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;
+              await exec(command);
+            }
           } else {
             // Sin música de fondo, solo combinamos con el audio principal
             const command = `ffmpeg -i "${processedVideos[0]}" -i "${audio.filepath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;

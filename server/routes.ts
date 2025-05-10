@@ -988,9 +988,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Obtener la música de fondo - si se especificó usamos esa, si no, buscamos una automáticamente
       let backgroundMusic = null;
-      // Variable para el volumen de la música de fondo, por defecto 0.2 (20%)
+      // Variable para el volumen de la música de fondo, por defecto 0.4 (40%)
+      // Aumentamos el volumen por defecto para que se escuche mejor
       // Usamos una variable diferente para evitar conflictos con backgroundMusicVolume de validatedData
-      let musicVolumeToUse = 0.2;
+      let musicVolumeToUse = 0.4;
       
       if (backgroundMusicId) {
         // Si el usuario especificó una música, intentamos obtenerla
@@ -1159,27 +1160,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log("Texto después de procesar saltos de línea:", JSON.stringify(titleText));
           
           // No implementar saltos de línea automáticos según lo solicitado
-          // Permitimos hasta 60 caracteres por línea según lo solicitado
-          const maxCharsPerLine = 60;
+          // Verificar la longitud del texto para ajustar el tamaño de la fuente
+          const textLength = titleText.length;
+          console.log(`Longitud del texto: ${textLength} caracteres`);
           
           // Forzar color de texto blanco según lo solicitado
           const textColor = '#ffffff'; // Siempre blanco
           
-          // Forzar tamaño de fuente a 24px según lo solicitado
-          const fontSize = 24; // Tamaño fijo
+          // Ajustar tamaño de fuente según la longitud del texto
+          let fontSize = 24; // Tamaño base
+          if (textLength > 50) {
+            fontSize = 22;
+          }
+          if (textLength > 70) {
+            fontSize = 20; // Para textos muy largos, reducir más
+          }
           
-          // Escapar comillas simples
-          const text = titleText.replace(/'/g, "\\'"); // Escape single quotes
+          // Dividir el texto en múltiples líneas si es muy largo y no tiene saltos de línea
+          if (textLength > 50 && !titleText.includes('\\n')) {
+            // Insertar saltos de línea cada ~40 caracteres en espacios
+            const words = titleText.split(' ');
+            let newText = '';
+            let lineLength = 0;
+            
+            for (const word of words) {
+              if (lineLength + word.length + 1 > 40) {
+                newText += '\\n' + word + ' ';
+                lineLength = word.length + 1;
+              } else {
+                newText += word + ' ';
+                lineLength += word.length + 1;
+              }
+            }
+            
+            titleText = newText.trim();
+            console.log("Texto con saltos de línea automáticos:", JSON.stringify(titleText));
+          }
+          
+          // Escapar comillas simples y dobles
+          const escapedText = titleText.replace(/'/g, "'\\''").replace(/"/g, '\\"');
         
           // Título con fondo negro que solo cubre el texto
           // Perfectamente centrado horizontal y verticalmente
           const textX = '(w-tw)/2'; // Centrado horizontal exacto
-          const textY = 'h-th-150'; // Subimos la posición un 25% aproximadamente (desde 50px a 150px del borde inferior)
+          const textY = 'h-th-150'; // Posición a 150px del borde inferior
           
-          // Estilo con fondo negro que solo cubre el texto (mejor estabilidad)
-          // Escapar las comillas simples y dobles para evitar problemas con FFmpeg
-          const escapedText = text.replace(/'/g, "'\\''").replace(/"/g, '\\"');
-          textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${escapedText}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=black@0.8:boxborderw=5`;
+          // Estilo con fondo negro que solo cubre el texto y permite textos largos
+          textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${escapedText}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=black@0.8:boxborderw=5:line_spacing=10`;
           
           console.log(`Aplicando texto con saltos de línea: "${titleText}" con tamaño ${fontSize}px`);
         }

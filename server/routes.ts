@@ -258,11 +258,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...updates
       };
       
-      // No tenemos un método específico en el storage para actualizar proyectos
-      // así que lo hacemos directamente en el Map de la clase MemStorage
-      // Nota: Esto es una solución temporal, en una implementación real
-      // tendríamos un método updateProject en el storage
-      storage.projects.set(projectId, updatedProject);
+      // Utilizamos el método updateProject de la clase DatabaseStorage
+      await storage.updateProject(projectId, updates);
       
       res.json(updatedProject);
     } catch (error) {
@@ -274,17 +271,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Obtener la plantilla más reciente (último proyecto con isTemplate=true)
   app.get("/api/templates/latest", async (req, res) => {
     try {
-      // No tenemos un método específico en el storage, así que implementamos la lógica aquí
-      // En una aplicación real, esto estaría en el storage
-      let latestTemplate = null;
-      let latestDate = "";
-      
-      for (const [_, project] of storage.projects.entries()) {
-        if (project.isTemplate && project.createdAt > latestDate) {
-          latestTemplate = project;
-          latestDate = project.createdAt;
-        }
-      }
+      // Utilizamos el método getLatestTemplate de DatabaseStorage
+      const latestTemplate = await storage.getLatestTemplate();
       
       if (latestTemplate) {
         return res.json(latestTemplate);

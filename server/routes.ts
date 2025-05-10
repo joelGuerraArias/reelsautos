@@ -988,10 +988,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Obtener la música de fondo - si se especificó usamos esa, si no, buscamos una automáticamente
       let backgroundMusic = null;
-      // Variable para el volumen de la música de fondo, por defecto 0.4 (40%)
-      // Aumentamos el volumen por defecto para que se escuche mejor
+      // Variable para el volumen de la música de fondo, por defecto 1.0 (100%)
+      // Aumentamos el volumen al máximo para asegurarnos de que se escuche la música
       // Usamos una variable diferente para evitar conflictos con backgroundMusicVolume de validatedData
-      let musicVolumeToUse = 0.4;
+      let musicVolumeToUse = 1.0;
       
       if (backgroundMusicId) {
         // Si el usuario especificó una música, intentamos obtenerla
@@ -1206,7 +1206,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const textY = 'h-th-150'; // Posición a 150px del borde inferior
           
           // Estilo con fondo negro que solo cubre el texto y permite textos largos
-          textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${escapedText}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=black@0.8:boxborderw=5:line_spacing=10`;
+          // Aumentamos el boxborderw y reducimos el tamaño de fuente para textos largos
+          const boxBorderWidth = 8; // Mayor borde para mejor visibilidad
+          
+          // Para texto largo, forzamos saltos de línea para asegurar que se vea completo
+          if (titleText.length > 40 && !titleText.includes("\\n")) {
+            // Dividir el texto en 2 líneas si es largo
+            const mitad = Math.ceil(titleText.length / 2);
+            let primeraMitad = titleText.substring(0, mitad);
+            let segundaMitad = titleText.substring(mitad);
+            
+            // Intentar dividir en una palabra para que se vea mejor
+            const ultimoEspacio = primeraMitad.lastIndexOf(" ");
+            if (ultimoEspacio > 0) {
+              segundaMitad = primeraMitad.substring(ultimoEspacio + 1) + segundaMitad;
+              primeraMitad = primeraMitad.substring(0, ultimoEspacio);
+            }
+            
+            // Nuevo texto con salto de línea forzado
+            const nuevoTexto = `${primeraMitad}\\n${segundaMitad}`;
+            console.log("Texto dividido en dos líneas:", nuevoTexto);
+            
+            // IMPORTANTE: creamos un nuevo texto escapado con el salto de línea
+            escapedText = nuevoTexto.replace(/'/g, "'\\''").replace(/"/g, '\\"');
+          }
+          
+          textOverlay = `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${escapedText}':fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=black@0.8:boxborderw=${boxBorderWidth}:line_spacing=15:borderw=1`;
           
           console.log(`Aplicando texto con saltos de línea: "${titleText}" con tamaño ${fontSize}px`);
         }
@@ -1427,7 +1452,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             console.log(`Mezclando audio principal con música de fondo: ${backgroundMusic.filepath}, volumen: ${musicVolumeToUse * 100}%`);
             // Mezclar el audio principal con la música de fondo
-            const mixAudioCommand = `ffmpeg -i "${audio.filepath}" -i "${backgroundMusic.filepath}" -filter_complex "[0:a]volume=1.0[a1];[1:a]volume=${musicVolumeToUse}[a2];[a1][a2]amix=inputs=2:duration=longest[aout]" -map "[aout]" "${mixedAudioPath}"`;
+            // Aumentamos el volumen de la música y añadimos parámetros para mezclado más prioritario
+            const mixAudioCommand = `ffmpeg -i "${audio.filepath}" -i "${backgroundMusic.filepath}" -filter_complex "[0:a]volume=0.8[a1];[1:a]volume=${musicVolumeToUse}[a2];[a1][a2]amix=inputs=2:duration=longest:weights=3 1[aout]" -map "[aout]" "${mixedAudioPath}"`;
             try {
               await exec(mixAudioCommand);
               
@@ -1476,7 +1502,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             console.log(`Mezclando audio principal con música de fondo para videos múltiples: ${backgroundMusic.filepath}, volumen: ${musicVolumeToUse * 100}%`);
             // Mezclar el audio principal con la música de fondo
-            const mixAudioCommand = `ffmpeg -i "${audio.filepath}" -i "${backgroundMusic.filepath}" -filter_complex "[0:a]volume=1.0[a1];[1:a]volume=${musicVolumeToUse}[a2];[a1][a2]amix=inputs=2:duration=longest[aout]" -map "[aout]" "${mixedAudioPath}"`;
+            // Aumentamos el volumen de la música y ajustamos la mezcla para mejor balance
+            const mixAudioCommand = `ffmpeg -i "${audio.filepath}" -i "${backgroundMusic.filepath}" -filter_complex "[0:a]volume=0.8[a1];[1:a]volume=${musicVolumeToUse}[a2];[a1][a2]amix=inputs=2:duration=longest:weights=3 1[aout]" -map "[aout]" "${mixedAudioPath}"`;
             
             try {
               await exec(mixAudioCommand);

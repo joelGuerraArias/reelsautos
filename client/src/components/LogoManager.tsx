@@ -51,6 +51,18 @@ export function LogoManager({ onSelectLogo, selectedLogoId }: LogoManagerProps =
     }
   });
 
+  // Obtener los logos guardados como favoritos
+  const { data: savedLogos = [] } = useQuery<any[]>({
+    queryKey: ['/api/saved-logos'],
+    refetchOnWindowFocus: false
+  });
+
+  // Obtener la configuración de la aplicación
+  const { data: appSettings } = useQuery<any>({
+    queryKey: ['/api/app-settings'],
+    refetchOnWindowFocus: false
+  });
+
   // Mutation para eliminar un logo
   const deleteLogoMutation = useMutation({
     mutationFn: async (logoId: number) => {
@@ -72,6 +84,17 @@ export function LogoManager({ onSelectLogo, selectedLogoId }: LogoManagerProps =
       });
     }
   });
+  
+  // Comprobar si un logo está en uso (en configuración o como favorito)
+  const isLogoInUse = (logoId: number): boolean => {
+    // Comprobar si está seleccionado en las configuraciones de la app
+    if (appSettings?.selectedLogoId === logoId) {
+      return true;
+    }
+    
+    // Comprobar si está guardado como favorito
+    return savedLogos.some((savedLogo: any) => savedLogo.logoId === logoId);
+  };
 
   const handleLogoUpload = async () => {
     if (!logoFile || !logoName.trim()) {
@@ -100,6 +123,17 @@ export function LogoManager({ onSelectLogo, selectedLogoId }: LogoManagerProps =
   };
 
   const handleDeleteLogo = async (logoId: number) => {
+    // Verificar si el logo está en uso antes de intentar eliminarlo
+    if (isLogoInUse(logoId)) {
+      toast({
+        variant: "destructive",
+        title: "No se puede eliminar este logo",
+        description: "Este logo está en uso en la configuración de la aplicación o guardado como favorito. Por favor, seleccione otro logo primero."
+      });
+      return;
+    }
+    
+    // Si no está en uso, confirmar eliminación
     if (confirm("¿Está seguro que desea eliminar este logo?")) {
       try {
         await deleteLogoMutation.mutateAsync(logoId);
@@ -199,17 +233,28 @@ export function LogoManager({ onSelectLogo, selectedLogoId }: LogoManagerProps =
                       />
                       <p className="text-xs mt-1 truncate">{logo.name}</p>
                       
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        className="absolute -top-2 -right-2 h-7 w-7"
-                        onClick={(e) => {
-                          e.stopPropagation(); // Evita que se seleccione el logo al hacer clic en eliminar
-                          handleDeleteLogo(logo.id);
-                        }}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
+                      {isLogoInUse(logo.id) ? (
+                        <div 
+                          className="absolute -top-2 -right-2 h-7 w-7 flex items-center justify-center bg-amber-100 text-amber-700 border border-amber-300 rounded-full cursor-help"
+                          title="Este logo está en uso y no puede ser eliminado. Seleccione otro logo primero."
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"></path>
+                          </svg>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="absolute -top-2 -right-2 h-7 w-7"
+                          onClick={(e) => {
+                            e.stopPropagation(); // Evita que se seleccione el logo al hacer clic en eliminar
+                            handleDeleteLogo(logo.id);
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      )}
                     </div>
                   ))}
                 </div>

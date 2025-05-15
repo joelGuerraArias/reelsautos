@@ -1527,6 +1527,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error("No valid photos or uploaded video provided");
       }
       
+      // Asegurarnos de que el archivo sea accesible en ambas rutas
+      // Esto soluciona el problema ENOENT al acceder a los videos generados
+      const workspaceOutputPath = path.join(WORKSPACE_VIDEO_DIR, outputFilename);
+      if (fs.existsSync(outputPath) && !fs.existsSync(workspaceOutputPath)) {
+        try {
+          // Copiar el archivo al directorio workspace si es necesario
+          fs.copyFileSync(outputPath, workspaceOutputPath);
+          console.log(`Video copiado a ruta alternativa: ${workspaceOutputPath}`);
+        } catch (copyError) {
+          console.error(`Error al copiar video a ruta alternativa: ${copyError}`);
+        }
+      }
+      
       // Save the video record
       const videoData = {
         filename: outputFilename,

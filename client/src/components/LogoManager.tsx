@@ -9,7 +9,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 
-export function LogoManager() {
+interface LogoManagerProps {
+  onSelectLogo?: (logoId: number) => void;
+  selectedLogoId?: number | null;
+}
+
+export function LogoManager({ onSelectLogo, selectedLogoId }: LogoManagerProps = {}) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -18,7 +23,7 @@ export function LogoManager() {
   const [logoName, setLogoName] = useState<string>("");
 
   // Obtener logos existentes
-  const { data: logos, isLoading } = useQuery({
+  const { data: logos = [], isLoading } = useQuery<Logo[]>({
     queryKey: ['/api/logos'],
     refetchOnWindowFocus: false
   });
@@ -26,10 +31,7 @@ export function LogoManager() {
   // Mutation para subir un nuevo logo
   const uploadLogoMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      return await apiRequest('/api/logos', {
-        method: 'POST',
-        body: formData,
-      });
+      return await apiRequest("POST", "/api/logos", formData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/logos'] });
@@ -52,9 +54,7 @@ export function LogoManager() {
   // Mutation para eliminar un logo
   const deleteLogoMutation = useMutation({
     mutationFn: async (logoId: number) => {
-      return await apiRequest(`/api/logos/${logoId}`, {
-        method: 'DELETE',
-      });
+      return await apiRequest("DELETE", `/api/logos/${logoId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/logos'] });
@@ -185,7 +185,13 @@ export function LogoManager() {
               ) : logos && logos.length > 0 ? (
                 <div className="grid grid-cols-3 gap-4">
                   {logos.map((logo: Logo) => (
-                    <div key={logo.id} className="relative border rounded-md p-2 text-center">
+                    <div 
+                      key={logo.id} 
+                      className={`relative border rounded-md p-2 text-center cursor-pointer ${
+                        selectedLogoId === logo.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                      }`}
+                      onClick={() => onSelectLogo && onSelectLogo(logo.id)}
+                    >
                       <img 
                         src={logo.filepath} 
                         alt={logo.name}
@@ -197,7 +203,10 @@ export function LogoManager() {
                         variant="destructive"
                         size="icon"
                         className="absolute -top-2 -right-2 h-7 w-7"
-                        onClick={() => handleDeleteLogo(logo.id)}
+                        onClick={(e) => {
+                          e.stopPropagation(); // Evita que se seleccione el logo al hacer clic en eliminar
+                          handleDeleteLogo(logo.id);
+                        }}
                       >
                         <Trash2 size={14} />
                       </Button>

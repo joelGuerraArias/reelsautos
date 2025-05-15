@@ -698,7 +698,6 @@ export default function VideoSettings({
                 <LogoManager 
                   onSelectLogo={(logoId) => setSelectedLogoId(logoId)}
                   selectedLogoId={selectedLogoId}
-                  showUploader={true}
                 />
               </div>
               

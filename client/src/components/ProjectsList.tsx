@@ -8,7 +8,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest } from "@/lib/queryClient";
-import { FilePlus, FileEdit, BookCopy, Copy, Trash2 } from "lucide-react";
+import { 
+  FilePlus, 
+  FileEdit, 
+  BookCopy, 
+  Copy, 
+  Trash2, 
+  RotateCcw,
+  AlertTriangle
+} from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Función para formatear fechas
 const formatDate = (dateString: string) => {
@@ -37,18 +55,21 @@ interface ProjectsListProps {
   onCreateNewProject: () => void;
   onLoadTemplate: (templateId: string) => void;
   currentProjectId?: string;
+  onResetProject?: (projectId: string) => void;
 }
 
 export default function ProjectsList({
   onSelectProject,
   onCreateNewProject,
   onLoadTemplate,
-  currentProjectId
+  currentProjectId,
+  onResetProject
 }: ProjectsListProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<string>("projects");
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
 
   // Queries para proyectos y plantillas
   const { data: projects, isLoading: isLoadingProjects } = useQuery({
@@ -136,6 +157,53 @@ export default function ProjectsList({
     }
   };
 
+  const [resetProjectId, setResetProjectId] = useState<string | null>(null);
+
+  const openResetDialog = (projectId: string) => {
+    setResetProjectId(projectId);
+    setIsResetDialogOpen(true);
+  };
+
+  const handleResetProject = async () => {
+    if (!resetProjectId) return;
+    
+    try {
+      const response = await apiRequest('POST', `/api/projects/${resetProjectId}/reset`);
+
+      if (response.ok) {
+        toast({
+          title: "Proyecto reiniciado",
+          description: "Se han eliminado todas las fotos, videos, audios y configuraciones del proyecto"
+        });
+        
+        // Refrescar los datos del proyecto
+        queryClient.invalidateQueries({ queryKey: [`/api/projects/${resetProjectId}`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/projects/${resetProjectId}/photos`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/projects/${resetProjectId}/uploaded-videos`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/projects/${resetProjectId}/audio`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/projects/${resetProjectId}/video`] });
+
+        // Si el proyecto actual fue reiniciado y existe una función de callback
+        if (resetProjectId === currentProjectId && onResetProject) {
+          onResetProject(resetProjectId);
+        }
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Error al reiniciar el proyecto');
+      }
+    } catch (error) {
+      console.error("Error resetting project:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Error al reiniciar el proyecto",
+        variant: "destructive"
+      });
+    } finally {
+      setIsResetDialogOpen(false);
+      setResetProjectId(null);
+    }
+  };
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -200,6 +268,14 @@ export default function ProjectsList({
                       >
                         <FileEdit className="mr-2 h-4 w-4" />
                         Abrir
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => openResetDialog(project.id)}
+                      >
+                        <RotateCcw className="mr-2 h-4 w-4" />
+                        Reiniciar
                       </Button>
                       <Button 
                         variant="destructive" 
@@ -285,6 +361,34 @@ export default function ProjectsList({
           </TabsContent>
         </Tabs>
       </CardContent>
+      
+      {/* Reset Confirmation Dialog */}
+      <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center text-amber-600">
+              <AlertTriangle className="mr-2 h-5 w-5" />
+              Reiniciar Proyecto
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará todas las fotos, videos, audios y configuraciones del proyecto.
+              <br /><br />
+              <span className="font-semibold">El proyecto en sí no será eliminado</span>, pero volverá a su estado inicial.
+              <br /><br />
+              ¿Estás seguro de que deseas continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleResetProject}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              Sí, Reiniciar Proyecto
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

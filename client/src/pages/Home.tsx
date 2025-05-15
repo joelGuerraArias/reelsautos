@@ -341,6 +341,25 @@ export default function Home() {
     });
   };
   
+  // Handler for resetting a project
+  const handleResetProject = (resetProjectId: string) => {
+    // Si es el proyecto actual, actualizar la UI
+    if (resetProjectId === projectId) {
+      // Invalidar todas las consultas para el proyecto
+      queryClient.invalidateQueries();
+      
+      // Volver al primer paso
+      setCurrentStep(Step.UPLOAD_PHOTOS);
+      
+      setIsProjectsListOpen(false);
+      
+      toast({
+        title: "Proyecto reiniciado",
+        description: "El proyecto ha sido reiniciado correctamente"
+      });
+    }
+  };
+  
   // Get project title for display
   useEffect(() => {
     if (projectQuery.data) {

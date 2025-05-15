@@ -270,12 +270,13 @@ export default function ProjectsList({
                         Abrir
                       </Button>
                       <Button 
-                        variant="outline" 
+                        variant="destructive" 
                         size="sm"
                         onClick={() => openResetDialog(project.id)}
+                        className="bg-red-600 hover:bg-red-700 border-2 border-red-800"
                       >
                         <RotateCcw className="mr-2 h-4 w-4" />
-                        Reiniciar
+                        Reiniciar Todo
                       </Button>
                       <Button 
                         variant="destructive" 

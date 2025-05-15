@@ -8,6 +8,7 @@ import {
   ImagePlus, FileVideo, Loader2, Trash2, Music, Volume2 
 } from 'lucide-react';
 import { SavedLogos } from './SavedLogos';
+import { LogoManager } from './LogoManager';
 import { formatDuration } from '@/lib/utils';
 
 interface VideoSettingsProps {
@@ -692,101 +693,14 @@ export default function VideoSettings({
             </div>
           ) : (
             <>
-              {/* Logo favoritos guardados */}
-              <SavedLogos 
-                onSelectLogo={(logoId) => setSelectedLogoId(logoId)}
-                selectedLogoId={selectedLogoId}
-              />
-            
-              {/* Todos los logos disponibles */}
-              {logosQuery.data && Array.isArray(logosQuery.data) && logosQuery.data.length > 0 ? (
-                <div className="border border-gray-200 rounded-lg p-3 mt-4">
-                  <div className="text-sm font-medium mb-2">Todos los logos:</div>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                    {logosQuery.data.map((logo: Logo) => (
-                      <button
-                        key={logo.id}
-                        className={`p-2 rounded-md border ${
-                          selectedLogoId === logo.id 
-                            ? 'bg-blue-50 border-blue-300' 
-                            : 'border-gray-200 hover:bg-gray-50'
-                        }`}
-                        onClick={() => setSelectedLogoId(logo.id)}
-                      >
-                        <div className="aspect-square w-full flex items-center justify-center bg-gray-100 rounded-md mb-1 overflow-hidden">
-                          <img 
-                            src={`/api/logos/${logo.id}/file`}
-                            alt={logo.name}
-                            className="max-h-full max-w-full object-contain"
-                          />
-                        </div>
-                        <div className="text-xs font-medium truncate">
-                          {logo.name}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-gray-500 text-sm mb-2">
-                  No hay logos disponibles. Sube uno nuevo.
-                </div>
-              )}
-              
-              {logoFile ? (
-                <div className="mt-3 p-2 bg-blue-50 rounded-md border border-blue-200">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Image className="w-4 h-4 text-blue-500 mr-2" />
-                      <span className="text-sm font-medium">{logoFile.name}</span>
-                    </div>
-                    <button 
-                      className="text-red-500 hover:text-red-700"
-                      onClick={() => setLogoFile(null)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                  <div className="mt-2">
-                    <input
-                      type="text"
-                      placeholder="Nombre del logo"
-                      value={logoName}
-                      onChange={(e) => setLogoName(e.target.value)}
-                      className="mb-2 w-full px-3 py-1 border border-gray-300 rounded-md text-sm"
-                    />
-                    <button
-                      className="w-full py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
-                      onClick={uploadLogo}
-                      disabled={uploadingLogo}
-                    >
-                      {uploadingLogo ? (
-                        <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                      ) : 'Subir Logo'}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-3">
-                  <label className="inline-flex items-center justify-center w-full px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer">
-                    <ImagePlus className="w-4 h-4 mr-2" />
-                    {uploadingLogo ? 'Subiendo...' : 'Subir nuevo logo'}
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      disabled={uploadingLogo}
-                    />
-                  </label>
-                  {uploadingLogo && (
-                    <div className="flex items-center justify-center mt-2">
-                      <Loader2 className="w-5 h-5 animate-spin text-blue-500 mr-2" />
-                      <span className="text-sm text-blue-600">Subiendo imagen...</span>
-                    </div>
-                  )}
-                </div>
-              )}
+              <div className="logo-management-section">
+                {/* Usamos el nuevo componente LogoManager que incluye la opción de eliminar */}
+                <LogoManager 
+                  onSelectLogo={(logoId) => setSelectedLogoId(logoId)}
+                  selectedLogoId={selectedLogoId}
+                  showUploader={true}
+                />
+              </div>
               
               {selectedLogoId && (
                 <div className="mt-4">

@@ -1009,14 +1009,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Verificar que el archivo de música existe
           if (backgroundMusic && backgroundMusic.filepath) {
             if (!fs.existsSync(backgroundMusic.filepath)) {
-              console.error(`El archivo de música de fondo no existe en la ruta: ${backgroundMusic.filepath}`);
-              backgroundMusic = null; // Si el archivo no existe, no lo usamos
+              console.log(`El archivo de música de fondo no existe en la ruta: ${backgroundMusic.filepath}`);
+              // Intentar buscar cualquier archivo de música en el directorio
+              const musicDir = path.join('/home/runner/workspace/uploads/background_music');
+              if (fs.existsSync(musicDir)) {
+                const files = fs.readdirSync(musicDir);
+                if (files.length > 0) {
+                  // Usar el primer archivo de música que encontremos
+                  const newMusicPath = path.join(musicDir, files[0]);
+                  console.log(`Usando música alternativa: ${newMusicPath}`);
+                  backgroundMusic.filepath = newMusicPath;
+                } else {
+                  backgroundMusic = null;
+                }
+              } else {
+                backgroundMusic = null;
+              }
             } else if (validatedData.backgroundMusicVolume) {
               // Si el usuario especificó un volumen, lo utilizamos
               const volumeValue = typeof validatedData.backgroundMusicVolume === 'string' ? 
                 parseFloat(validatedData.backgroundMusicVolume) : 
                 Number(validatedData.backgroundMusicVolume);
-              musicVolumeToUse = isNaN(volumeValue) ? 0.2 : volumeValue;
+              musicVolumeToUse = isNaN(volumeValue) ? 0.6 : volumeValue;
             }
           } else {
             console.warn(`Música de fondo con ID ${backgroundMusicId} no encontrada o ruta no válida`);
@@ -1443,7 +1457,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await exec(mixAudioCommand);
               
               // Combinar el video procesado con el audio mezclado
-              const command = `ffmpeg -i "${processedVideos[0]}" -i "${mixedAudioPath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;
+              // Usamos el parámetro -t para asegurar que la duración del video coincida con la duración del audio
+              // y quitamos -shortest para evitar que se corte el audio prematuramente
+              const audioDuration = audio.duration || 0;
+              console.log(`Ajustando la duración del video para que coincida con el audio: ${audioDuration} segundos`);
+              
+              // Si el video es más corto que el audio, lo extendemos con loop
+              const command = `ffmpeg -i "${processedVideos[0]}" -stream_loop -1 -i "${processedVideos[0]}" -i "${mixedAudioPath}" -filter_complex "[0:v][1:v]concat=n=2:v=1:a=0[outv]" -map "[outv]" -map 2:a -c:v libx264 -c:a aac -t ${audioDuration} "${outputPath}"`;
               await exec(command);
               
               // Limpiar el archivo de audio mezclado
@@ -1454,12 +1474,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.error("Error al mezclar audio con música de fondo:", error);
               // Si hay error con la música de fondo, usar solo el audio principal
               console.log("Usando solo audio principal debido a error con música de fondo");
-              const command = `ffmpeg -i "${processedVideos[0]}" -i "${audio.filepath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;
+              const audioDuration = audio.duration || 0;
+              // Si el video es más corto que el audio, lo extendemos con loop
+              const command = `ffmpeg -i "${processedVideos[0]}" -stream_loop -1 -i "${processedVideos[0]}" -i "${audio.filepath}" -filter_complex "[0:v][1:v]concat=n=2:v=1:a=0[outv]" -map "[outv]" -map 2:a -c:v libx264 -c:a aac -t ${audioDuration} "${outputPath}"`;
               await exec(command);
             }
           } else {
             // Sin música de fondo, solo combinamos con el audio principal
-            const command = `ffmpeg -i "${processedVideos[0]}" -i "${audio.filepath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;
+            // Usamos el parámetro -t para asegurar que la duración del video coincida con la duración del audio
+            const audioDuration = audio.duration || 0;
+            console.log(`Ajustando la duración del video para que coincida con el audio (sin música de fondo): ${audioDuration} segundos`);
+            
+            // Si el video es más corto que el audio, lo extendemos con loop
+            const command = `ffmpeg -i "${processedVideos[0]}" -stream_loop -1 -i "${processedVideos[0]}" -i "${audio.filepath}" -filter_complex "[0:v][1:v]concat=n=2:v=1:a=0[outv]" -map "[outv]" -map 2:a -c:v libx264 -c:a aac -t ${audioDuration} "${outputPath}"`;
             await exec(command);
           }
         } else {
@@ -1494,7 +1521,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await exec(mixAudioCommand);
               
               // Combinar el video concatenado con el audio mezclado
-              const finalCommand = `ffmpeg -i "${concatOutputPath}" -i "${mixedAudioPath}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputPath}"`;
+              const audioDuration = audio.duration || 0;
+              console.log(`Ajustando la duración del video concatenado con el audio mezclado: ${audioDuration} segundos`);
+              
+              // Usamos -t para asegurar que el video tenga la misma duración que el audio
+              const finalCommand = `ffmpeg -i "${concatOutputPath}" -i "${mixedAudioPath}" -c:v libx264 -c:a aac -map 0:v -map 1:a -t ${audioDuration} "${outputPath}"`;
               await exec(finalCommand);
               
               // Limpiar el archivo de audio mezclado

@@ -36,6 +36,10 @@ const LOGO_DIR = path.join(UPLOAD_DIR, "logos");
 const UPLOADED_VIDEO_DIR = path.join(UPLOAD_DIR, "uploaded_videos");
 const BACKGROUND_MUSIC_DIR = path.join(UPLOAD_DIR, "background_music");
 
+// También configuramos la ruta alternativa para compatibilidad
+const WORKSPACE_UPLOAD_DIR = "/home/runner/workspace/uploads";
+const WORKSPACE_VIDEO_DIR = path.join(WORKSPACE_UPLOAD_DIR, "videos");
+
 // Create directories if they don't exist
 fs.mkdirSync(PHOTO_DIR, { recursive: true });
 fs.mkdirSync(AUDIO_DIR, { recursive: true });
@@ -43,6 +47,10 @@ fs.mkdirSync(VIDEO_DIR, { recursive: true });
 fs.mkdirSync(LOGO_DIR, { recursive: true });
 fs.mkdirSync(UPLOADED_VIDEO_DIR, { recursive: true });
 fs.mkdirSync(BACKGROUND_MUSIC_DIR, { recursive: true });
+
+// Crear también los directorios de workspace para compatibilidad con rutas alternativas
+fs.mkdirSync(WORKSPACE_UPLOAD_DIR, { recursive: true });
+fs.mkdirSync(WORKSPACE_VIDEO_DIR, { recursive: true });
 
 // Configure multer for file uploads
 // Configuración para fotos
@@ -988,10 +996,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Obtener la música de fondo - si se especificó usamos esa, si no, buscamos una automáticamente
       let backgroundMusic = null;
-      // Variable para el volumen de la música de fondo, por defecto 0.4 (40%)
-      // Lo dejamos en 40% según la preferencia del usuario
+      // Variable para el volumen de la música de fondo, por defecto 0.6 (60%)
+      // Aumentamos a 60% para asegurar que la música se escuche correctamente
       // Usamos una variable diferente para evitar conflictos con backgroundMusicVolume de validatedData
-      let musicVolumeToUse = 0.4;
+      let musicVolumeToUse = 0.6;
       
       if (backgroundMusicId) {
         // Si el usuario especificó una música, intentamos obtenerla

@@ -15,9 +15,19 @@ import ErrorDisplay from "@/components/ErrorDisplay";
 import SaveProjectDialog from "@/components/SaveProjectDialog";
 import ProjectsList from "@/components/ProjectsList";
 import { Photo, Audio, Video, ElevenLabsVoice, Project } from "@shared/schema";
-import { Film, Wand2, Settings, Save, FolderOpen, FilePlus } from "lucide-react";
+import { Film, Wand2, Settings, Save, FolderOpen, FilePlus, RotateCcw } from "lucide-react";
 import { Dialog, DialogTrigger, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Step definitions
 enum Step {
@@ -305,6 +315,7 @@ export default function Home() {
   // States for dialogs
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [isProjectsListOpen, setIsProjectsListOpen] = useState(false);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [projectTitle, setProjectTitle] = useState<string | undefined>(undefined);
   
   // Handler for saving a project
@@ -413,6 +424,16 @@ export default function Home() {
                 <FilePlus className="mr-2 h-4 w-4" />
                 Nuevo
               </Button>
+              
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={() => setIsResetDialogOpen(true)}
+                className="bg-red-600 hover:bg-red-700 border-2 border-red-800"
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Reiniciar Todo
+              </Button>
             </div>
           </div>
         </header>
@@ -441,6 +462,37 @@ export default function Home() {
             />
           </DialogContent>
         </Dialog>
+        
+        {/* Reset Confirmation Dialog */}
+        <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center text-red-600">
+                <RotateCcw className="mr-2 h-5 w-5" />
+                Reiniciar Proyecto
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción eliminará todas las fotos, videos, audios y configuraciones del proyecto.
+                <br /><br />
+                <span className="font-semibold">El proyecto en sí no será eliminado</span>, pero volverá a su estado inicial.
+                <br /><br />
+                ¿Estás seguro de que deseas continuar?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => {
+                  handleResetProject(projectId);
+                  setIsResetDialogOpen(false);
+                }}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Sí, Reiniciar Proyecto
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Main Content */}
         <main>

@@ -2185,6 +2185,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to delete project" });
     }
   });
+  
+  // Reiniciar un proyecto (eliminar fotos, videos, audio, y configuraciones)
+  app.post("/api/projects/:id/reset", async (req, res) => {
+    try {
+      const projectId = req.params.id;
+      
+      // Verificar si el proyecto existe
+      const existingProject = await storage.getProject(projectId);
+      if (!existingProject) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      
+      console.log(`Reiniciando proyecto: ${projectId}`);
+      
+      // 1. Eliminar todas las fotos asociadas al proyecto
+      const photos = await storage.getPhotosByProjectId(projectId);
+      for (const photo of photos) {
+        try {
+          // Eliminar archivo físico
+          if (photo.filepath && fs.existsSync(photo.filepath)) {
+            fs.unlinkSync(photo.filepath);
+          }
+          // Eliminar de la base de datos
+          await storage.deletePhoto(photo.id);
+        } catch (photoError) {
+          console.error(`Error eliminando foto ${photo.id}:`, photoError);
+        }
+      }
+      
+      // 2. Eliminar videos subidos asociados al proyecto
+      const uploadedVideos = await storage.getUploadedVideosByProjectId(projectId);
+      for (const video of uploadedVideos) {
+        try {
+          // Eliminar archivo físico
+          if (video.filepath && fs.existsSync(video.filepath)) {
+            fs.unlinkSync(video.filepath);
+          }
+          // Eliminar de la base de datos
+          await storage.deleteUploadedVideo(video.id);
+        } catch (videoError) {
+          console.error(`Error eliminando video subido ${video.id}:`, videoError);
+        }
+      }
+      
+      // 3. Eliminar el audio generado para el proyecto
+      const audio = await storage.getAudioByProjectId(projectId);
+      if (audio) {
+        try {
+          // Eliminar archivo físico
+          if (audio.filepath && fs.existsSync(audio.filepath)) {
+            fs.unlinkSync(audio.filepath);
+          }
+          // No hay método para eliminar audio, pero se sobrescribirá si se genera uno nuevo
+        } catch (audioError) {
+          console.error(`Error eliminando audio:`, audioError);
+        }
+      }
+      
+      // 4. Eliminar el video generado para el proyecto
+      const video = await storage.getVideoByProjectId(projectId);
+      if (video) {
+        try {
+          // Eliminar archivo físico
+          if (video.filepath && fs.existsSync(video.filepath)) {
+            fs.unlinkSync(video.filepath);
+          }
+          // No hay método para eliminar video, pero se sobrescribirá si se genera uno nuevo
+        } catch (videoError) {
+          console.error(`Error eliminando video:`, videoError);
+        }
+      }
+      
+      // 5. Restablecer las configuraciones del proyecto a valores por defecto
+      const resetConfig = {
+        title: existingProject.title, // Mantenemos el título
+        description: existingProject.description, // Mantenemos la descripción
+        showTitle: false,
+        titleText: '',
+        titleFontSize: 24,
+        titleColor: '#ffffff',
+        titlePosition: 'bottom',
+        selectedVoiceId: null,
+        selectedLogoId: null,
+        logoPosition: 'top-right',
+        backgroundMusicId: null,
+        backgroundMusicVolume: 0.6, // Valor por defecto actualizado a 60%
+        useUploadedVideo: false
+      };
+      
+      await storage.updateProject(projectId, resetConfig);
+      
+      res.json({ success: true, message: "Proyecto reiniciado correctamente" });
+    } catch (error) {
+      console.error("Error resetting project:", error);
+      res.status(500).json({ error: "Error al reiniciar el proyecto" });
+    }
+  });
 
   // Obtener todos los proyectos (no plantillas)
   app.get("/api/projects", async (req, res) => {

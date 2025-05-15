@@ -436,6 +436,7 @@ export default function Home() {
                 setIsProjectsListOpen(false);
               }}
               onLoadTemplate={handleSelectProject}
+              onResetProject={handleResetProject}
               currentProjectId={projectId}
             />
           </DialogContent>

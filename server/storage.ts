@@ -674,5 +674,373 @@ class MemStorage implements IStorage {
   async deleteUploadedVideo(id: number): Promise<boolean> { return this.uploadedVideos.delete(id); }
 }
 
-// Usar almacenamiento en memoria debido a problemas de conectividad con la base de datos
-export const storage = new MemStorage();
+// Implementación mejorada con persistencia en archivos JSON para simular SQL
+class PersistentStorage implements IStorage {
+  private dataFile = './data/storage.json';
+  private data: any = {
+    projects: {},
+    photos: {},
+    audios: {},
+    videos: {},
+    uploadedVideos: {},
+    savedVoices: {},
+    logos: {},
+    savedLogos: {},
+    appSettings: null,
+    userPreferences: null,
+    backgroundMusic: {},
+    idCounter: 1
+  };
+
+  constructor() {
+    this.loadData();
+  }
+
+  private loadData() {
+    try {
+      const fs = require('fs');
+      if (fs.existsSync(this.dataFile)) {
+        const rawData = fs.readFileSync(this.dataFile, 'utf8');
+        this.data = JSON.parse(rawData);
+      }
+    } catch (error) {
+      console.log('Initializing new storage data');
+    }
+  }
+
+  private saveData() {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const dir = path.dirname(this.dataFile);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(this.dataFile, JSON.stringify(this.data, null, 2));
+    } catch (error) {
+      console.error('Error saving data:', error);
+    }
+  }
+
+  // User methods
+  async getUser(id: number): Promise<User | undefined> {
+    return undefined;
+  }
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return undefined;
+  }
+  async createUser(user: InsertUser): Promise<User> {
+    return { id: this.data.idCounter++, ...user } as User;
+  }
+
+  // Project methods
+  async createProject(project: InsertProject): Promise<Project> {
+    const newProject = { 
+      ...project, 
+      createdAt: new Date().toISOString(),
+      isTemplate: project.isTemplate || false
+    } as Project;
+    this.data.projects[project.id] = newProject;
+    this.saveData();
+    return newProject;
+  }
+
+  async getProject(id: string): Promise<Project | undefined> {
+    return this.data.projects[id];
+  }
+
+  async updateProject(id: string, project: Partial<InsertProject>): Promise<Project> {
+    const existing = this.data.projects[id];
+    if (!existing) throw new Error("Project not found");
+    const updated = { ...existing, ...project };
+    this.data.projects[id] = updated;
+    this.saveData();
+    return updated;
+  }
+
+  async getAllProjects(): Promise<Project[]> {
+    return Object.values(this.data.projects).filter((p: any) => !p.isTemplate);
+  }
+
+  async getTemplates(): Promise<Project[]> {
+    return Object.values(this.data.projects).filter((p: any) => p.isTemplate);
+  }
+
+  async getLatestTemplate(): Promise<Project | undefined> {
+    const templates = await this.getTemplates();
+    return templates.length > 0 ? templates[templates.length - 1] : undefined;
+  }
+
+  // Photo methods
+  async createPhoto(photo: InsertPhoto): Promise<Photo> {
+    const newPhoto = { 
+      ...photo, 
+      id: this.data.idCounter++, 
+      createdAt: new Date().toISOString() 
+    } as Photo;
+    this.data.photos[newPhoto.id] = newPhoto;
+    this.saveData();
+    return newPhoto;
+  }
+
+  async getPhoto(id: number): Promise<Photo | undefined> {
+    return this.data.photos[id];
+  }
+
+  async getPhotosByProjectId(projectId: string): Promise<Photo[]> {
+    return Object.values(this.data.photos).filter((p: any) => p.projectId === projectId);
+  }
+
+  async deletePhoto(id: number): Promise<boolean> {
+    const existed = delete this.data.photos[id];
+    if (existed) this.saveData();
+    return existed;
+  }
+
+  // Audio methods
+  async createAudio(audio: InsertAudio): Promise<Audio> {
+    const newAudio = { 
+      ...audio, 
+      id: this.data.idCounter++, 
+      createdAt: new Date().toISOString() 
+    } as Audio;
+    this.data.audios[newAudio.id] = newAudio;
+    this.saveData();
+    return newAudio;
+  }
+
+  async getAudio(id: number): Promise<Audio | undefined> {
+    return this.data.audios[id];
+  }
+
+  async getAudioByProjectId(projectId: string): Promise<Audio | undefined> {
+    return Object.values(this.data.audios).find((a: any) => a.projectId === projectId);
+  }
+
+  // Video methods
+  async createVideo(video: InsertVideo): Promise<Video> {
+    const newVideo = { 
+      ...video, 
+      id: this.data.idCounter++, 
+      createdAt: new Date().toISOString() 
+    } as Video;
+    this.data.videos[newVideo.id] = newVideo;
+    this.saveData();
+    return newVideo;
+  }
+
+  async getVideo(id: number): Promise<Video | undefined> {
+    return this.data.videos[id];
+  }
+
+  async getVideoByProjectId(projectId: string): Promise<Video | undefined> {
+    return Object.values(this.data.videos).find((v: any) => v.projectId === projectId);
+  }
+
+  async getVideosByProjectId(projectId: string): Promise<Video[]> {
+    return Object.values(this.data.videos).filter((v: any) => v.projectId === projectId);
+  }
+
+  // Uploaded Video methods
+  async createUploadedVideo(video: InsertUploadedVideo): Promise<UploadedVideo> {
+    const newVideo = { 
+      ...video, 
+      id: this.data.idCounter++, 
+      createdAt: new Date().toISOString() 
+    } as UploadedVideo;
+    this.data.uploadedVideos[newVideo.id] = newVideo;
+    this.saveData();
+    return newVideo;
+  }
+
+  async getUploadedVideo(id: number): Promise<UploadedVideo | undefined> {
+    return this.data.uploadedVideos[id];
+  }
+
+  async getUploadedVideosByProjectId(projectId: string): Promise<UploadedVideo[]> {
+    return Object.values(this.data.uploadedVideos).filter((v: any) => v.projectId === projectId);
+  }
+
+  async deleteUploadedVideo(id: number): Promise<boolean> {
+    const existed = delete this.data.uploadedVideos[id];
+    if (existed) this.saveData();
+    return existed;
+  }
+
+  // Implementaciones simplificadas para otros métodos requeridos
+  async getFavoriteVoice(): Promise<UserPreferences | undefined> { 
+    return this.data.userPreferences; 
+  }
+  
+  async saveFavoriteVoice(preferences: InsertUserPreferences): Promise<UserPreferences> {
+    this.data.userPreferences = { 
+      ...preferences, 
+      id: this.data.idCounter++, 
+      createdAt: new Date().toISOString() 
+    } as UserPreferences;
+    this.saveData();
+    return this.data.userPreferences;
+  }
+  
+  async updateFavoriteVoice(preferences: InsertUserPreferences): Promise<UserPreferences> {
+    return this.saveFavoriteVoice(preferences);
+  }
+
+  async getSavedVoices(): Promise<SavedVoice[]> { 
+    return Object.values(this.data.savedVoices); 
+  }
+  
+  async getSavedVoice(id: number): Promise<SavedVoice | undefined> { 
+    return this.data.savedVoices[id]; 
+  }
+  
+  async getSavedVoiceByPosition(position: number): Promise<SavedVoice | undefined> {
+    return Object.values(this.data.savedVoices).find((v: any) => v.position === position);
+  }
+  
+  async getDefaultSavedVoice(): Promise<SavedVoice | undefined> {
+    return Object.values(this.data.savedVoices).find((v: any) => v.isDefault);
+  }
+  
+  async saveSavedVoice(voice: InsertSavedVoice): Promise<SavedVoice> {
+    const newVoice = { 
+      ...voice, 
+      id: this.data.idCounter++, 
+      createdAt: new Date().toISOString() 
+    } as SavedVoice;
+    this.data.savedVoices[newVoice.id] = newVoice;
+    this.saveData();
+    return newVoice;
+  }
+  
+  async updateSavedVoice(id: number, voice: Partial<InsertSavedVoice>): Promise<SavedVoice> {
+    const existing = this.data.savedVoices[id];
+    if (!existing) throw new Error("Voice not found");
+    const updated = { ...existing, ...voice };
+    this.data.savedVoices[id] = updated;
+    this.saveData();
+    return updated;
+  }
+  
+  async deleteSavedVoice(id: number): Promise<boolean> { 
+    const existed = delete this.data.savedVoices[id];
+    if (existed) this.saveData();
+    return existed;
+  }
+
+  async getLogos(): Promise<Logo[]> { 
+    return Object.values(this.data.logos); 
+  }
+  
+  async getLogo(id: number): Promise<Logo | undefined> { 
+    return this.data.logos[id]; 
+  }
+  
+  async createLogo(logo: InsertLogo): Promise<Logo> {
+    const newLogo = { 
+      ...logo, 
+      id: this.data.idCounter++, 
+      createdAt: new Date().toISOString() 
+    } as Logo;
+    this.data.logos[newLogo.id] = newLogo;
+    this.saveData();
+    return newLogo;
+  }
+  
+  async deleteLogo(id: number): Promise<boolean> { 
+    const existed = delete this.data.logos[id];
+    if (existed) this.saveData();
+    return existed;
+  }
+
+  async getSavedLogos(): Promise<SavedLogo[]> { 
+    return Object.values(this.data.savedLogos); 
+  }
+  
+  async getSavedLogo(id: number): Promise<SavedLogo | undefined> { 
+    return this.data.savedLogos[id]; 
+  }
+  
+  async getSavedLogoByPosition(position: number): Promise<SavedLogo | undefined> {
+    return Object.values(this.data.savedLogos).find((l: any) => l.position === position);
+  }
+  
+  async getDefaultSavedLogo(): Promise<SavedLogo | undefined> {
+    return Object.values(this.data.savedLogos).find((l: any) => l.isDefault);
+  }
+  
+  async saveSavedLogo(logo: InsertSavedLogo): Promise<SavedLogo> {
+    const newLogo = { 
+      ...logo, 
+      id: this.data.idCounter++, 
+      createdAt: new Date().toISOString() 
+    } as SavedLogo;
+    this.data.savedLogos[newLogo.id] = newLogo;
+    this.saveData();
+    return newLogo;
+  }
+  
+  async updateSavedLogo(id: number, logo: Partial<InsertSavedLogo>): Promise<SavedLogo> {
+    const existing = this.data.savedLogos[id];
+    if (!existing) throw new Error("Logo not found");
+    const updated = { ...existing, ...logo };
+    this.data.savedLogos[id] = updated;
+    this.saveData();
+    return updated;
+  }
+  
+  async deleteSavedLogo(id: number): Promise<boolean> { 
+    const existed = delete this.data.savedLogos[id];
+    if (existed) this.saveData();
+    return existed;
+  }
+
+  async getAppSettings(): Promise<AppSettings | undefined> { 
+    return this.data.appSettings; 
+  }
+  
+  async saveAppSettings(settings: InsertAppSettings): Promise<AppSettings> {
+    this.data.appSettings = { 
+      ...settings, 
+      id: this.data.idCounter++, 
+      createdAt: new Date().toISOString() 
+    } as AppSettings;
+    this.saveData();
+    return this.data.appSettings;
+  }
+  
+  async updateAppSettings(settings: Partial<InsertAppSettings>): Promise<AppSettings> {
+    if (!this.data.appSettings) throw new Error("No app settings found");
+    this.data.appSettings = { ...this.data.appSettings, ...settings };
+    this.saveData();
+    return this.data.appSettings;
+  }
+
+  async getBackgroundMusic(): Promise<BackgroundMusic[]> { 
+    return Object.values(this.data.backgroundMusic); 
+  }
+  
+  async getBackgroundMusicById(id: number): Promise<BackgroundMusic | undefined> { 
+    return this.data.backgroundMusic[id]; 
+  }
+  
+  async createBackgroundMusic(music: InsertBackgroundMusic): Promise<BackgroundMusic> {
+    const newMusic = { 
+      ...music, 
+      id: this.data.idCounter++, 
+      createdAt: new Date().toISOString() 
+    } as BackgroundMusic;
+    this.data.backgroundMusic[newMusic.id] = newMusic;
+    this.saveData();
+    return newMusic;
+  }
+  
+  async deleteBackgroundMusic(id: number): Promise<boolean> { 
+    const existed = delete this.data.backgroundMusic[id];
+    if (existed) this.saveData();
+    return existed;
+  }
+}
+
+// Usar almacenamiento persistente con archivos JSON
+export const storage = new PersistentStorage();

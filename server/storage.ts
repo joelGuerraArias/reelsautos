@@ -468,4 +468,211 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+// Implementación temporal de almacenamiento en memoria
+class MemStorage implements IStorage {
+  private projects = new Map<string, Project>();
+  private photos = new Map<number, Photo>();
+  private audios = new Map<number, Audio>();
+  private videos = new Map<number, Video>();
+  private uploadedVideos = new Map<number, UploadedVideo>();
+  private savedVoices = new Map<number, SavedVoice>();
+  private logos = new Map<number, Logo>();
+  private savedLogos = new Map<number, SavedLogo>();
+  private appSettings: AppSettings | undefined;
+  private userPreferences: UserPreferences | undefined;
+  private backgroundMusicList = new Map<number, BackgroundMusic>();
+  private idCounter = 1;
+
+  // User methods (simples para testing)
+  async getUser(id: number): Promise<User | undefined> {
+    return undefined;
+  }
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return undefined;
+  }
+  async createUser(user: InsertUser): Promise<User> {
+    return { id: this.idCounter++, ...user } as User;
+  }
+
+  // Project methods
+  async createProject(project: InsertProject): Promise<Project> {
+    const newProject = { ...project, createdAt: new Date().toISOString() } as Project;
+    this.projects.set(project.id, newProject);
+    return newProject;
+  }
+
+  async getProject(id: string): Promise<Project | undefined> {
+    return this.projects.get(id);
+  }
+
+  async updateProject(id: string, project: Partial<InsertProject>): Promise<Project> {
+    const existing = this.projects.get(id);
+    if (!existing) throw new Error("Project not found");
+    const updated = { ...existing, ...project };
+    this.projects.set(id, updated);
+    return updated;
+  }
+
+  async getAllProjects(): Promise<Project[]> {
+    return Array.from(this.projects.values()).filter(p => !p.isTemplate);
+  }
+
+  async getTemplates(): Promise<Project[]> {
+    return Array.from(this.projects.values()).filter(p => p.isTemplate);
+  }
+
+  async getLatestTemplate(): Promise<Project | undefined> {
+    const templates = await this.getTemplates();
+    return templates.length > 0 ? templates[templates.length - 1] : undefined;
+  }
+
+  // Photo methods
+  async createPhoto(photo: InsertPhoto): Promise<Photo> {
+    const newPhoto = { ...photo, id: this.idCounter++, createdAt: new Date().toISOString() } as Photo;
+    this.photos.set(newPhoto.id, newPhoto);
+    return newPhoto;
+  }
+
+  async getPhoto(id: number): Promise<Photo | undefined> {
+    return this.photos.get(id);
+  }
+
+  async getPhotosByProjectId(projectId: string): Promise<Photo[]> {
+    return Array.from(this.photos.values()).filter(p => p.projectId === projectId);
+  }
+
+  async deletePhoto(id: number): Promise<boolean> {
+    return this.photos.delete(id);
+  }
+
+  // Audio methods
+  async createAudio(audio: InsertAudio): Promise<Audio> {
+    const newAudio = { ...audio, id: this.idCounter++, createdAt: new Date().toISOString() } as Audio;
+    this.audios.set(newAudio.id, newAudio);
+    return newAudio;
+  }
+
+  async getAudio(id: number): Promise<Audio | undefined> {
+    return this.audios.get(id);
+  }
+
+  async getAudioByProjectId(projectId: string): Promise<Audio | undefined> {
+    return Array.from(this.audios.values()).find(a => a.projectId === projectId);
+  }
+
+  // Video methods
+  async createVideo(video: InsertVideo): Promise<Video> {
+    const newVideo = { ...video, id: this.idCounter++, createdAt: new Date().toISOString() } as Video;
+    this.videos.set(newVideo.id, newVideo);
+    return newVideo;
+  }
+
+  async getVideo(id: number): Promise<Video | undefined> {
+    return this.videos.get(id);
+  }
+
+  async getVideoByProjectId(projectId: string): Promise<Video | undefined> {
+    return Array.from(this.videos.values()).find(v => v.projectId === projectId);
+  }
+
+  async getVideosByProjectId(projectId: string): Promise<Video[]> {
+    return Array.from(this.videos.values()).filter(v => v.projectId === projectId);
+  }
+
+  // Stubs para otros métodos requeridos por la interfaz
+  async getFavoriteVoice(): Promise<UserPreferences | undefined> { return this.userPreferences; }
+  async saveFavoriteVoice(preferences: InsertUserPreferences): Promise<UserPreferences> {
+    this.userPreferences = { ...preferences, id: this.idCounter++, createdAt: new Date().toISOString() } as UserPreferences;
+    return this.userPreferences;
+  }
+  async updateFavoriteVoice(preferences: InsertUserPreferences): Promise<UserPreferences> {
+    return this.saveFavoriteVoice(preferences);
+  }
+
+  async getSavedVoices(): Promise<SavedVoice[]> { return Array.from(this.savedVoices.values()); }
+  async getSavedVoice(id: number): Promise<SavedVoice | undefined> { return this.savedVoices.get(id); }
+  async getSavedVoiceByPosition(position: number): Promise<SavedVoice | undefined> {
+    return Array.from(this.savedVoices.values()).find(v => v.position === position);
+  }
+  async getDefaultSavedVoice(): Promise<SavedVoice | undefined> {
+    return Array.from(this.savedVoices.values()).find(v => v.isDefault);
+  }
+  async saveSavedVoice(voice: InsertSavedVoice): Promise<SavedVoice> {
+    const newVoice = { ...voice, id: this.idCounter++, createdAt: new Date().toISOString() } as SavedVoice;
+    this.savedVoices.set(newVoice.id, newVoice);
+    return newVoice;
+  }
+  async updateSavedVoice(id: number, voice: Partial<InsertSavedVoice>): Promise<SavedVoice> {
+    const existing = this.savedVoices.get(id);
+    if (!existing) throw new Error("Voice not found");
+    const updated = { ...existing, ...voice };
+    this.savedVoices.set(id, updated);
+    return updated;
+  }
+  async deleteSavedVoice(id: number): Promise<boolean> { return this.savedVoices.delete(id); }
+
+  async getLogos(): Promise<Logo[]> { return Array.from(this.logos.values()); }
+  async getLogo(id: number): Promise<Logo | undefined> { return this.logos.get(id); }
+  async createLogo(logo: InsertLogo): Promise<Logo> {
+    const newLogo = { ...logo, id: this.idCounter++, createdAt: new Date().toISOString() } as Logo;
+    this.logos.set(newLogo.id, newLogo);
+    return newLogo;
+  }
+  async deleteLogo(id: number): Promise<boolean> { return this.logos.delete(id); }
+
+  async getSavedLogos(): Promise<SavedLogo[]> { return Array.from(this.savedLogos.values()); }
+  async getSavedLogo(id: number): Promise<SavedLogo | undefined> { return this.savedLogos.get(id); }
+  async getSavedLogoByPosition(position: number): Promise<SavedLogo | undefined> {
+    return Array.from(this.savedLogos.values()).find(l => l.position === position);
+  }
+  async getDefaultSavedLogo(): Promise<SavedLogo | undefined> {
+    return Array.from(this.savedLogos.values()).find(l => l.isDefault);
+  }
+  async saveSavedLogo(logo: InsertSavedLogo): Promise<SavedLogo> {
+    const newLogo = { ...logo, id: this.idCounter++, createdAt: new Date().toISOString() } as SavedLogo;
+    this.savedLogos.set(newLogo.id, newLogo);
+    return newLogo;
+  }
+  async updateSavedLogo(id: number, logo: Partial<InsertSavedLogo>): Promise<SavedLogo> {
+    const existing = this.savedLogos.get(id);
+    if (!existing) throw new Error("Logo not found");
+    const updated = { ...existing, ...logo };
+    this.savedLogos.set(id, updated);
+    return updated;
+  }
+  async deleteSavedLogo(id: number): Promise<boolean> { return this.savedLogos.delete(id); }
+
+  async getAppSettings(): Promise<AppSettings | undefined> { return this.appSettings; }
+  async saveAppSettings(settings: InsertAppSettings): Promise<AppSettings> {
+    this.appSettings = { ...settings, id: this.idCounter++, createdAt: new Date().toISOString() } as AppSettings;
+    return this.appSettings;
+  }
+  async updateAppSettings(settings: Partial<InsertAppSettings>): Promise<AppSettings> {
+    if (!this.appSettings) throw new Error("No app settings found");
+    this.appSettings = { ...this.appSettings, ...settings };
+    return this.appSettings;
+  }
+
+  async getBackgroundMusic(): Promise<BackgroundMusic[]> { return Array.from(this.backgroundMusicList.values()); }
+  async getBackgroundMusicById(id: number): Promise<BackgroundMusic | undefined> { return this.backgroundMusicList.get(id); }
+  async createBackgroundMusic(music: InsertBackgroundMusic): Promise<BackgroundMusic> {
+    const newMusic = { ...music, id: this.idCounter++, createdAt: new Date().toISOString() } as BackgroundMusic;
+    this.backgroundMusicList.set(newMusic.id, newMusic);
+    return newMusic;
+  }
+  async deleteBackgroundMusic(id: number): Promise<boolean> { return this.backgroundMusicList.delete(id); }
+
+  async createUploadedVideo(video: InsertUploadedVideo): Promise<UploadedVideo> {
+    const newVideo = { ...video, id: this.idCounter++, createdAt: new Date().toISOString() } as UploadedVideo;
+    this.uploadedVideos.set(newVideo.id, newVideo);
+    return newVideo;
+  }
+  async getUploadedVideo(id: number): Promise<UploadedVideo | undefined> { return this.uploadedVideos.get(id); }
+  async getUploadedVideosByProjectId(projectId: string): Promise<UploadedVideo[]> {
+    return Array.from(this.uploadedVideos.values()).filter(v => v.projectId === projectId);
+  }
+  async deleteUploadedVideo(id: number): Promise<boolean> { return this.uploadedVideos.delete(id); }
+}
+
+// Usar almacenamiento en memoria debido a problemas de conectividad con la base de datos
+export const storage = new MemStorage();

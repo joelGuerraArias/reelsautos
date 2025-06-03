@@ -97,7 +97,12 @@ export function LogoManager({ onSelectLogo, selectedLogoId }: LogoManagerProps =
   };
 
   const handleLogoUpload = async () => {
+    console.log("Starting logo upload process");
+    console.log("Logo file:", logoFile);
+    console.log("Logo name:", logoName);
+    
     if (!logoFile || !logoName.trim()) {
+      console.log("Missing file or name");
       toast({
         variant: "destructive",
         title: "Error al subir el logo",
@@ -112,6 +117,11 @@ export function LogoManager({ onSelectLogo, selectedLogoId }: LogoManagerProps =
       const formData = new FormData();
       formData.append('logo', logoFile);
       formData.append('name', logoName);
+      
+      console.log("FormData created with entries:");
+      for (let [key, value] of formData.entries()) {
+        console.log(key, value);
+      }
       
       await uploadLogoMutation.mutateAsync(formData);
       setOpen(false);

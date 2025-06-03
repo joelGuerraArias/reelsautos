@@ -118,10 +118,9 @@ export function LogoManager({ onSelectLogo, selectedLogoId }: LogoManagerProps =
       formData.append('logo', logoFile);
       formData.append('name', logoName);
       
-      console.log("FormData created with entries:");
-      for (let [key, value] of formData.entries()) {
-        console.log(key, value);
-      }
+      console.log("FormData created successfully");
+      console.log("FormData has logo field:", formData.has('logo'));
+      console.log("FormData has name field:", formData.has('name'));
       
       await uploadLogoMutation.mutateAsync(formData);
       setOpen(false);
@@ -154,8 +153,18 @@ export function LogoManager({ onSelectLogo, selectedLogoId }: LogoManagerProps =
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("File change detected");
+    console.log("Files array:", e.target.files);
+    
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
+      console.log("Selected file details:", {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        file: file
+      });
+      
       setLogoFile(file);
       
       // Auto-populate name from filename if empty

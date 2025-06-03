@@ -2260,7 +2260,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (audio.filepath && fs.existsSync(audio.filepath)) {
             fs.unlinkSync(audio.filepath);
           }
-          // No hay método para eliminar audio, pero se sobrescribirá si se genera uno nuevo
+          // Eliminar registro de la base de datos
+          await storage.deleteAudio(audio.id);
         } catch (audioError) {
           console.error(`Error eliminando audio:`, audioError);
         }

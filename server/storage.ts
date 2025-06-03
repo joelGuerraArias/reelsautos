@@ -40,6 +40,7 @@ export interface IStorage {
   createAudio(audio: InsertAudio): Promise<Audio>;
   getAudio(id: number): Promise<Audio | undefined>;
   getAudioByProjectId(projectId: string): Promise<Audio | undefined>;
+  deleteAudio(id: number): Promise<boolean>;
   
   // Video methods
   createVideo(video: InsertVideo): Promise<Video>;
@@ -219,6 +220,16 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(audios.createdAt));
     
     return result[0];
+  }
+
+  async deleteAudio(id: number): Promise<boolean> {
+    try {
+      const result = await db.delete(audios).where(eq(audios.id, id));
+      return true;
+    } catch (error) {
+      console.error('Error deleting audio:', error);
+      return false;
+    }
   }
   
   // Video methods
@@ -560,6 +571,10 @@ class MemStorage implements IStorage {
     return Array.from(this.audios.values()).find(a => a.projectId === projectId);
   }
 
+  async deleteAudio(id: number): Promise<boolean> {
+    return this.audios.delete(id);
+  }
+
   // Video methods
   async createVideo(video: InsertVideo): Promise<Video> {
     const newVideo = { ...video, id: this.idCounter++, createdAt: new Date().toISOString() } as Video;
@@ -816,6 +831,15 @@ class PersistentStorage implements IStorage {
 
   async getAudioByProjectId(projectId: string): Promise<Audio | undefined> {
     return Object.values(this.data.audios).find((a: any) => a.projectId === projectId);
+  }
+
+  async deleteAudio(id: number): Promise<boolean> {
+    if (this.data.audios[id]) {
+      delete this.data.audios[id];
+      this.saveData();
+      return true;
+    }
+    return false;
   }
 
   // Video methods

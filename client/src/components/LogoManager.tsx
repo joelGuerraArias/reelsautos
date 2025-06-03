@@ -31,7 +31,7 @@ export function LogoManager({ onSelectLogo, selectedLogoId }: LogoManagerProps =
   // Mutation para subir un nuevo logo
   const uploadLogoMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      return await apiRequest("POST", "/api/logos", formData);
+      return await apiRequest("POST", "/api/logos", formData, { isFormData: true });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/logos'] });

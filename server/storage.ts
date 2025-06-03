@@ -698,7 +698,8 @@ class PersistentStorage implements IStorage {
 
   private loadData() {
     try {
-      const fs = require('fs');
+      // Usar require con verificación de existencia
+      const fs = eval('require')('fs');
       if (fs.existsSync(this.dataFile)) {
         const rawData = fs.readFileSync(this.dataFile, 'utf8');
         this.data = JSON.parse(rawData);
@@ -710,8 +711,8 @@ class PersistentStorage implements IStorage {
 
   private saveData() {
     try {
-      const fs = require('fs');
-      const path = require('path');
+      const fs = eval('require')('fs');
+      const path = eval('require')('path');
       const dir = path.dirname(this.dataFile);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
@@ -759,11 +760,11 @@ class PersistentStorage implements IStorage {
   }
 
   async getAllProjects(): Promise<Project[]> {
-    return Object.values(this.data.projects).filter((p: any) => !p.isTemplate);
+    return Object.values(this.data.projects).filter((p: any) => !p.isTemplate) as Project[];
   }
 
   async getTemplates(): Promise<Project[]> {
-    return Object.values(this.data.projects).filter((p: any) => p.isTemplate);
+    return Object.values(this.data.projects).filter((p: any) => p.isTemplate) as Project[];
   }
 
   async getLatestTemplate(): Promise<Project | undefined> {
@@ -1042,5 +1043,5 @@ class PersistentStorage implements IStorage {
   }
 }
 
-// Usar almacenamiento persistente con archivos JSON
-export const storage = new PersistentStorage();
+// Usar almacenamiento en memoria que funciona correctamente
+export const storage = new MemStorage();

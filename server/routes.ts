@@ -207,16 +207,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create a new project
   app.post("/api/projects", async (req, res) => {
     try {
-      const projectData = insertProjectSchema.parse(req.body);
+      console.log("Creating project with data:", req.body);
+      
+      const projectData = {
+        id: nanoid(),
+        title: req.body.title || "Proyecto sin título",
+        description: req.body.description || null,
+        createdAt: new Date().toISOString(),
+        updatedAt: null,
+        selectedVoiceId: null,
+        selectedLogoId: null,
+        logoPosition: null,
+        showTitle: null,
+        titleText: null,
+        titleFontSize: null,
+        titleColor: null,
+        titlePosition: null,
+        backgroundMusicId: null,
+        backgroundMusicVolume: null,
+        useUploadedVideo: null,
+        isTemplate: false
+      };
+
+      console.log("Processed project data:", projectData);
       const project = await storage.createProject(projectData);
+      console.log("Project created successfully:", project);
+      
       res.status(201).json(project);
     } catch (error) {
-      if (error instanceof ZodError) {
-        const validationError = fromZodError(error);
-        res.status(400).json({ error: validationError.message });
-      } else {
-        res.status(500).json({ error: "Failed to create project" });
-      }
+      console.error("Error creating project:", error);
+      res.status(500).json({ error: "Failed to create project" });
     }
   });
 
@@ -611,7 +631,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Subir un nuevo logo
   app.post("/api/logos", logoUpload.single("logo"), async (req, res) => {
     try {
+      console.log("Logo upload attempt started");
+      console.log("Request file:", req.file);
+      console.log("Request body:", req.body);
+      
       if (!req.file) {
+        console.log("No file uploaded");
         return res.status(400).json({ error: "No file uploaded" });
       }
       
@@ -623,20 +648,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updatedAt: new Date().toISOString()
       };
       
+      console.log("Logo data prepared:", logoData);
+      
       const parsedData = insertLogoSchema.parse(logoData);
+      console.log("Schema validation passed");
+      
       const logo = await storage.createLogo(parsedData);
+      console.log("Logo created successfully:", logo);
+      
       res.status(201).json(logo);
     } catch (error) {
+      console.error("Logo upload error:", error);
+      
       // Limpiar el archivo en caso de error
       if (req.file) {
-        fs.unlinkSync(req.file.path);
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (cleanupError) {
+          console.error("Error cleaning up file:", cleanupError);
+        }
       }
       
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
+        console.error("Validation error:", validationError.message);
         res.status(400).json({ error: validationError.message });
       } else {
-        res.status(500).json({ error: "Failed to upload logo" });
+        console.error("General error:", error.message);
+        res.status(500).json({ error: error.message || "Failed to upload logo" });
       }
     }
   });
@@ -2091,23 +2130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // API para gestionar proyectos
 
-  // Crear un nuevo proyecto
-  app.post("/api/projects", async (req, res) => {
-    try {
-      const projectData = {
-        id: nanoid(),
-        title: req.body.title || "Proyecto sin título",
-        createdAt: new Date().toISOString(),
-        isTemplate: false,
-      };
-
-      const project = await storage.createProject(projectData);
-      res.status(201).json(project);
-    } catch (error) {
-      console.error("Error creating project:", error);
-      res.status(500).json({ error: "Failed to create project" });
-    }
-  });
+  // Endpoint duplicado removido - usar el principal arriba
 
   // Obtener un proyecto por ID
   app.get("/api/projects/:id", async (req, res) => {

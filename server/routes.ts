@@ -210,7 +210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Creating project with data:", req.body);
       
       const projectData = {
-        id: nanoid(),
+        id: req.body.id || nanoid(),
         title: req.body.title || "Proyecto sin título",
         description: req.body.description || null,
         createdAt: new Date().toISOString(),
@@ -2132,21 +2132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Endpoint duplicado removido - usar el principal arriba
 
-  // Obtener un proyecto por ID
-  app.get("/api/projects/:id", async (req, res) => {
-    try {
-      const projectId = req.params.id;
-      const project = await storage.getProject(projectId);
-      
-      if (!project) {
-        return res.status(404).json({ error: "Project not found" });
-      }
-      
-      res.json(project);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to get project" });
-    }
-  });
+  // Endpoint duplicado removido - usar el principal arriba
 
   // Actualizar un proyecto
   app.patch("/api/projects/:id", async (req, res) => {
@@ -2388,15 +2374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener videos subidos para un proyecto
-  app.get("/api/projects/:id/uploaded-videos", async (req, res) => {
-    try {
-      const projectId = req.params.id;
-      const videos = await storage.getUploadedVideosByProjectId(projectId);
-      res.json(videos);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to get uploaded videos" });
-    }
-  });
+  // Endpoint duplicado removido - usar el principal arriba
 
   const httpServer = createServer(app);
   return httpServer;

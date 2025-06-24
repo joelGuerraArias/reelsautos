@@ -160,7 +160,10 @@ export default function PhotoUploader({ projectId }: PhotoUploaderProps) {
     onDrop,
     accept: {
       'image/jpeg': ['.jpg', '.jpeg'],
-      'image/png': ['.png']
+      'image/png': ['.png'],
+      'image/webp': ['.webp'],
+      'image/gif': ['.gif'],
+      'image/bmp': ['.bmp']
     },
     disabled: isUploading || uploadType === 'video',
     maxSize: 5 * 1024 * 1024 // 5MB
@@ -220,7 +223,7 @@ export default function PhotoUploader({ projectId }: PhotoUploaderProps) {
               <p className="mb-2 font-semibold text-lg">
                 {isDragActive ? "Suelta las fotos aquí" : "Arrastra fotos aquí o haz clic para subir"}
               </p>
-              <p className="text-sm text-gray-600 mb-2">Formatos soportados: JPG, PNG (tamaño mínimo: 640x360px)</p>
+              <p className="text-sm text-gray-600 mb-2">Formatos soportados: JPG, PNG, WEBP, GIF, BMP (tamaño mínimo: 640x360px)</p>
               
               {isUploading && (
                 <div className="mt-3">

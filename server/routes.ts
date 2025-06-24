@@ -68,11 +68,20 @@ const photoUpload = multer({
   storage: photoStorage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (req, file, cb) => {
-    // Accept only images
-    if (file.mimetype.startsWith("image/")) {
+    // Accept common image formats including WEBP
+    const allowedMimeTypes = [
+      'image/jpeg', 
+      'image/jpg', 
+      'image/png', 
+      'image/webp',
+      'image/gif',
+      'image/bmp'
+    ];
+    
+    if (allowedMimeTypes.includes(file.mimetype.toLowerCase())) {
       cb(null, true);
     } else {
-      cb(new Error("Only image files are allowed"));
+      cb(new Error("Solo se permiten archivos de imagen (JPEG, PNG, WEBP, GIF, BMP)"));
       return;
     }
   },

@@ -371,13 +371,35 @@ export default function Home() {
     }
   };
   
-  // Get project title for display
+  // Get project title for display and load project settings if they exist
   useEffect(() => {
     if (projectQuery.data) {
       const project = projectQuery.data as Project;
       setProjectTitle(project.title);
+      
+      // Si el proyecto tiene configuraciones guardadas, cargarlas en appSettings
+      if (project.titleText || project.showTitle !== null || project.selectedLogoId) {
+        console.log("Cargando configuraciones del proyecto en appSettings...");
+        apiRequest("PATCH", "/api/app-settings", {
+          selectedLogoId: project.selectedLogoId,
+          logoPosition: project.logoPosition,
+          showTitle: project.showTitle,
+          titleText: project.titleText,
+          titleFontSize: project.titleFontSize,
+          titleColor: project.titleColor,
+          titlePosition: project.titlePosition,
+          backgroundMusicId: project.backgroundMusicId,
+          backgroundMusicVolume: project.backgroundMusicVolume,
+          updatedAt: new Date().toISOString()
+        }).then(() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/app-settings'] });
+          console.log("✅ Configuraciones del proyecto cargadas");
+        }).catch((error) => {
+          console.error("Error al cargar configuraciones del proyecto:", error);
+        });
+      }
     }
-  }, [projectQuery.data]);
+  }, [projectQuery.data, queryClient]);
 
   return (
     <div className="bg-gray-50 text-gray-800 font-sans min-h-screen">

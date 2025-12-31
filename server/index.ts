@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -62,12 +63,14 @@ app.use((req, res, next) => {
   const port = 5000;
   // Aumentar el timeout para evitar errores 504 Gateway Timeout durante generación de videos
   server.timeout = 600000; // 10 minutos (600000 ms)
-  
+
+  // Use localhost for Windows compatibility
+  const host = process.platform === 'win32' ? 'localhost' : '0.0.0.0';
+
   server.listen({
     port,
-    host: "0.0.0.0",
-    reusePort: true,
+    host,
   }, () => {
-    log(`serving on port ${port} with increased timeout (10 minutes)`);
+    log(`serving on port ${port} (${host}) with increased timeout (10 minutes)`);
   });
 })();

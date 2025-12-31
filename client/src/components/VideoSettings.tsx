@@ -3,9 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Photo, Audio, UploadedVideo, AppSettings, Logo, SavedLogo } from '@shared/schema';
-import { 
+import {
   Image, Film, Settings, Upload, Check, Save, Info,
-  ImagePlus, FileVideo, Loader2, Trash2, Music, Volume2 
+  ImagePlus, FileVideo, Loader2, Trash2, Music, Volume2
 } from 'lucide-react';
 import { SavedLogos } from './SavedLogos';
 import { LogoManager } from './LogoManager';
@@ -22,19 +22,19 @@ interface VideoSettingsProps {
   onVideoSelectionChange?: (ids: number[]) => void;
 }
 
-export default function VideoSettings({ 
-  projectId, 
-  photos, 
-  audio, 
-  onBack, 
-  onContinue, 
+export default function VideoSettings({
+  projectId,
+  photos,
+  audio,
+  onBack,
+  onContinue,
   uploadedVideos,
   selectedVideoIds: initialSelectedVideoIds,
   onVideoSelectionChange
 }: VideoSettingsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   // Estado local para la configuración de video
   const [selectedLogoId, setSelectedLogoId] = useState<number | null>(null);
   const [logoPosition, setLogoPosition] = useState<string>("top-right");
@@ -46,21 +46,21 @@ export default function VideoSettings({
   const [uploadingLogo, setUploadingLogo] = useState<boolean>(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoName, setLogoName] = useState<string>("");
-  
+
   // Estado para la funcionalidad de video subido
   const [useUploadedVideo, setUseUploadedVideo] = useState<boolean>(false);
   const [uploadedVideo, setUploadedVideo] = useState<UploadedVideo | null>(null);
   const [uploadingVideo, setUploadingVideo] = useState<boolean>(false);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [selectedVideoIds, setSelectedVideoIds] = useState<number[]>(initialSelectedVideoIds || []);
-  
+
   // Efecto para notificar cambios en los videos seleccionados
   useEffect(() => {
     if (onVideoSelectionChange) {
       onVideoSelectionChange(selectedVideoIds);
     }
   }, [selectedVideoIds, onVideoSelectionChange]);
-  
+
   // Estado para la música de fondo
   const [useBackgroundMusic, setUseBackgroundMusic] = useState<boolean>(false);
   const [selectedBackgroundMusicId, setSelectedBackgroundMusicId] = useState<number | null>(null);
@@ -68,23 +68,23 @@ export default function VideoSettings({
   const [uploadingMusic, setUploadingMusic] = useState<boolean>(false);
   const [musicFile, setMusicFile] = useState<File | null>(null);
   const [musicName, setMusicName] = useState<string>("");
-  
+
   // Referencias a los inputs de archivos
   const videoInputRef = useRef<HTMLInputElement>(null);
   const musicInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Obtener la configuración actual
   const settingsQuery = useQuery({
     queryKey: ['/api/app-settings']
   });
-  
+
   // Obtener los logos disponibles
   const logosQuery = useQuery({
     queryKey: ['/api/logos'],
     retry: 3,
     retryDelay: 1000,
   });
-  
+
   // Obtener los videos subidos por el usuario para este proyecto
   const uploadedVideosQuery = useQuery({
     queryKey: [`/api/projects/${projectId}/uploaded-videos`],
@@ -92,7 +92,7 @@ export default function VideoSettings({
     retryDelay: 1000,
     enabled: useUploadedVideo, // Solo cargar cuando se active la opción
   });
-  
+
   // Obtener la música de fondo disponible
   const backgroundMusicQuery = useQuery({
     queryKey: ['/api/background-music'],
@@ -100,7 +100,7 @@ export default function VideoSettings({
     retryDelay: 1000,
     enabled: useBackgroundMusic, // Solo cargar cuando se active la opción
   });
-  
+
   // Efecto para actualizar el estado local cuando se carga la configuración
   useEffect(() => {
     if (settingsQuery.data) {
@@ -114,7 +114,7 @@ export default function VideoSettings({
       setTitlePosition(settings.titlePosition ?? "bottom-center");
     }
   }, [settingsQuery.data]);
-  
+
   // Efecto para poner por defecto el último video subido
   useEffect(() => {
     if (uploadedVideosQuery.data && Array.isArray(uploadedVideosQuery.data) && uploadedVideosQuery.data.length > 0) {
@@ -123,7 +123,7 @@ export default function VideoSettings({
       setUploadedVideo(latestVideo);
     }
   }, [uploadedVideosQuery.data]);
-  
+
   // Mutación para actualizar la configuración de la aplicación
   const updateSettingsMutation = useMutation({
     mutationFn: async (settings: Partial<AppSettings>) => {
@@ -140,10 +140,20 @@ export default function VideoSettings({
       });
     }
   });
-  
-  // Guardar la configuración actual
+
+  // Mutation para actualizar el proyecto con las configuraciones
+  const updateProjectMutation = useMutation({
+    mutationFn: async (settings: any) => {
+      return apiRequest("PATCH", `/api/projects/${projectId}`, settings);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
+    }
+  });
+
+  // Guardar la configuración actual (tanto en appSettings como en el proyecto)
   const saveSettings = async () => {
-    await updateSettingsMutation.mutateAsync({
+    const settings = {
       selectedLogoId,
       logoPosition,
       showTitle,
@@ -152,9 +162,15 @@ export default function VideoSettings({
       titleColor,
       titlePosition,
       updatedAt: new Date().toISOString()
-    });
+    };
+    
+    // Guardar en appSettings (global)
+    await updateSettingsMutation.mutateAsync(settings);
+    
+    // También guardar en el proyecto actual para que persista
+    await updateProjectMutation.mutateAsync(settings);
   };
-  
+
   // Subir un nuevo logo
   const uploadLogoMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -163,12 +179,12 @@ export default function VideoSettings({
         method: "POST",
         body: formData,
       });
-      
+
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.error || "Error al subir el logo");
       }
-      
+
       return await res.json();
     },
     onSuccess: (data) => {
@@ -181,7 +197,7 @@ export default function VideoSettings({
         title: "Logo subido",
         description: "Tu logo ha sido subido correctamente"
       });
-      
+
       // Actualizar la configuración con el nuevo logo
       updateSettingsMutation.mutate({
         selectedLogoId: data.id,
@@ -197,7 +213,7 @@ export default function VideoSettings({
       });
     }
   });
-  
+
   // Subir un nuevo video
   const uploadVideoMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -205,7 +221,7 @@ export default function VideoSettings({
         isFormData: true
       });
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/uploaded-videos`] });
       setUploadedVideo(data);
       setUploadingVideo(false);
@@ -224,7 +240,7 @@ export default function VideoSettings({
       });
     }
   });
-  
+
   // Subir música de fondo
   const uploadMusicMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -232,7 +248,7 @@ export default function VideoSettings({
         isFormData: true
       });
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/background-music'] });
       setSelectedBackgroundMusicId(data.id);
       setUploadingMusic(false);
@@ -252,7 +268,7 @@ export default function VideoSettings({
       });
     }
   });
-  
+
   // Manejadores de eventos para subir logo
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -260,45 +276,45 @@ export default function VideoSettings({
       const file = files[0];
       setLogoFile(file);
       setLogoName(file.name);
-      
+
       // Subir automáticamente cuando se selecciona un archivo
       const formData = new FormData();
       formData.append('logo', file); // Nombre correcto que espera el backend
       formData.append('name', file.name);
-      
+
       setUploadingLogo(true);
       uploadLogoMutation.mutate(formData);
     }
   };
-  
+
   const uploadLogo = () => {
     if (!logoFile) return;
-    
+
     setUploadingLogo(true);
     const formData = new FormData();
     formData.append('logo', logoFile); // Nombre correcto que espera el backend
     formData.append('name', logoName || logoFile.name);
-    
+
     uploadLogoMutation.mutate(formData);
   };
-  
+
   // Manejadores para subir video
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
       const file = files[0];
       setVideoFile(file);
-      
+
       // Subir automáticamente
       const formData = new FormData();
       formData.append('file', file);
       formData.append('projectId', projectId);
-      
+
       setUploadingVideo(true);
       uploadVideoMutation.mutate(formData);
     }
   };
-  
+
   // Manejadores para subir música
   const handleMusicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -308,18 +324,18 @@ export default function VideoSettings({
       setMusicName(file.name);
     }
   };
-  
+
   const uploadMusic = () => {
     if (!musicFile) return;
-    
+
     setUploadingMusic(true);
     const formData = new FormData();
-    formData.append('file', musicFile);
+    formData.append('music', musicFile);
     formData.append('name', musicName || musicFile.name);
-    
+
     uploadMusicMutation.mutate(formData);
   };
-  
+
   // Colores disponibles para el título
   const colors = [
     "#ffffff",  // blanco
@@ -331,7 +347,7 @@ export default function VideoSettings({
     "#ff00ff",  // magenta
     "#00ffff"   // cian
   ];
-  
+
   // Guardar la configuración y continuar
   const handleContinue = async () => {
     await saveSettings();
@@ -392,7 +408,7 @@ export default function VideoSettings({
               </>
             )}
           </div>
-          
+
           <div className="bg-gray-50 p-4 rounded-lg">
             <h3 className="font-medium text-gray-800 mb-2 flex items-center">
               <Music className="w-4 h-4 mr-1" />
@@ -404,7 +420,7 @@ export default function VideoSettings({
               <p className="text-green-600">Listo para usar</p>
             </div>
           </div>
-          
+
           <div className={`bg-gray-50 p-4 rounded-lg ${useBackgroundMusic ? 'border border-blue-200' : ''}`}>
             <h3 className="font-medium text-gray-800 mb-2 flex items-center">
               <Film className="w-4 h-4 mr-1" />
@@ -421,44 +437,42 @@ export default function VideoSettings({
           </div>
         </div>
       </div>
-      
+
       {/* Configuración de Video Integrada */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-6">
         <h2 className="text-xl font-bold mb-4 flex items-center">
           <Settings className="mr-2" size={20} />
           Configuración de Video
         </h2>
-        
+
         {/* Tipo de contenido */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold mb-2">Tipo de Contenido</h3>
-          
+
           <div className="flex space-x-4">
-            <button 
+            <button
               onClick={() => setUseUploadedVideo(false)}
-              className={`px-4 py-2 rounded-lg flex items-center ${
-                !useUploadedVideo 
-                  ? 'bg-blue-100 text-blue-700 border border-blue-300' 
-                  : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
-              }`}
+              className={`px-4 py-2 rounded-lg flex items-center ${!useUploadedVideo
+                ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                }`}
             >
               <Image className="w-4 h-4 mr-1" />
               Fotos ({photos.length})
             </button>
-            
-            <button 
+
+            <button
               onClick={() => setUseUploadedVideo(true)}
-              className={`px-4 py-2 rounded-lg flex items-center ${
-                useUploadedVideo 
-                  ? 'bg-blue-100 text-blue-700 border border-blue-300' 
-                  : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
-              }`}
+              className={`px-4 py-2 rounded-lg flex items-center ${useUploadedVideo
+                ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                }`}
             >
               <FileVideo className="w-4 h-4 mr-1" />
               Video Subido
             </button>
           </div>
-          
+
           {/* Uploader para video */}
           {useUploadedVideo && (
             <div className="mt-3">
@@ -472,15 +486,14 @@ export default function VideoSettings({
                     {uploadedVideosQuery.data.map((video: UploadedVideo) => (
                       <div
                         key={video.id}
-                        className={`text-left p-2 rounded-md flex items-center ${
-                          selectedVideoIds.includes(video.id) 
-                            ? 'bg-blue-50 border border-blue-200' 
-                            : 'border border-gray-200 hover:bg-gray-50'
-                        }`}
+                        className={`text-left p-2 rounded-md flex items-center ${selectedVideoIds.includes(video.id)
+                          ? 'bg-blue-50 border border-blue-200'
+                          : 'border border-gray-200 hover:bg-gray-50'
+                          }`}
                       >
                         <div className="flex-shrink-0 mr-2">
-                          <input 
-                            type="checkbox" 
+                          <input
+                            type="checkbox"
                             checked={selectedVideoIds.includes(video.id)}
                             onChange={() => {
                               // Toggle selection
@@ -489,16 +502,15 @@ export default function VideoSettings({
                               } else {
                                 setSelectedVideoIds([...selectedVideoIds, video.id]);
                               }
-                              
+
                               // Also set this as the primary video for backward compatibility
                               setUploadedVideo(video);
                             }}
                             className="w-4 h-4 accent-blue-600"
                           />
                         </div>
-                        <FileVideo className={`w-4 h-4 mr-2 ${
-                          selectedVideoIds.includes(video.id) ? 'text-blue-500' : 'text-gray-500'
-                        }`} />
+                        <FileVideo className={`w-4 h-4 mr-2 ${selectedVideoIds.includes(video.id) ? 'text-blue-500' : 'text-gray-500'
+                          }`} />
                         <div className="flex-1">
                           <div className="font-medium truncate w-60">{video.filename}</div>
                           <div className="text-xs text-gray-500">
@@ -508,13 +520,13 @@ export default function VideoSettings({
                       </div>
                     ))}
                   </div>
-                  
+
                   <div className="flex items-center justify-between mt-3 text-sm">
                     <span className="text-gray-600">
                       {selectedVideoIds.length} {selectedVideoIds.length === 1 ? 'video seleccionado' : 'videos seleccionados'}
                     </span>
                     {selectedVideoIds.length > 0 && (
-                      <button 
+                      <button
                         className="text-red-500 hover:text-red-700"
                         onClick={() => setSelectedVideoIds([])}
                       >
@@ -524,7 +536,7 @@ export default function VideoSettings({
                   </div>
                 </div>
               ) : null}
-              
+
               <div className="mt-2">
                 <button
                   className="text-blue-600 hover:text-blue-800 flex items-center text-sm font-medium"
@@ -554,14 +566,14 @@ export default function VideoSettings({
             </div>
           )}
         </div>
-        
+
         {/* Música de fondo */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold mb-2 flex items-center">
             <Music className="mr-2" size={18} />
             Música de Fondo
           </h3>
-          
+
           <div className="flex items-center mb-3">
             <input
               type="checkbox"
@@ -574,7 +586,7 @@ export default function VideoSettings({
               Agregar música de fondo al video
             </label>
           </div>
-          
+
           {useBackgroundMusic && (
             <div className="border border-gray-200 rounded-lg p-3">
               {backgroundMusicQuery.isLoading ? (
@@ -588,16 +600,14 @@ export default function VideoSettings({
                     {backgroundMusicQuery.data.map((music: any) => (
                       <button
                         key={music.id}
-                        className={`text-left p-2 rounded-md flex items-center ${
-                          selectedBackgroundMusicId === music.id 
-                            ? 'bg-blue-50 border border-blue-200' 
-                            : 'border border-gray-200 hover:bg-gray-50'
-                        }`}
+                        className={`text-left p-2 rounded-md flex items-center ${selectedBackgroundMusicId === music.id
+                          ? 'bg-blue-50 border border-blue-200'
+                          : 'border border-gray-200 hover:bg-gray-50'
+                          }`}
                         onClick={() => setSelectedBackgroundMusicId(music.id)}
                       >
-                        <Music className={`w-4 h-4 mr-2 ${
-                          selectedBackgroundMusicId === music.id ? 'text-blue-500' : 'text-gray-500'
-                        }`} />
+                        <Music className={`w-4 h-4 mr-2 ${selectedBackgroundMusicId === music.id ? 'text-blue-500' : 'text-gray-500'
+                          }`} />
                         <div className="flex-1">
                           <div className="font-medium">{music.name}</div>
                         </div>
@@ -613,7 +623,7 @@ export default function VideoSettings({
                   No hay música disponible. Sube un archivo de audio.
                 </div>
               )}
-              
+
               {musicFile ? (
                 <div className="mt-3 p-2 bg-blue-50 rounded-md border border-blue-200">
                   <div className="flex items-center justify-between">
@@ -621,7 +631,7 @@ export default function VideoSettings({
                       <Music className="w-4 h-4 text-blue-500 mr-2" />
                       <span className="text-sm font-medium">{musicFile.name}</span>
                     </div>
-                    <button 
+                    <button
                       className="text-red-500 hover:text-red-700"
                       onClick={() => setMusicFile(null)}
                     >
@@ -658,7 +668,7 @@ export default function VideoSettings({
                   />
                 </div>
               )}
-              
+
               {selectedBackgroundMusicId && (
                 <div className="mt-3">
                   <label className="flex items-center text-sm font-medium mb-1">
@@ -679,14 +689,14 @@ export default function VideoSettings({
             </div>
           )}
         </div>
-        
+
         {/* Selección de Logo */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold mb-2 flex items-center">
             <Image className="mr-2" size={18} />
             Logo
           </h3>
-          
+
           {logosQuery.isLoading ? (
             <div className="animate-pulse space-y-2">
               <div className="h-16 bg-gray-200 rounded-md w-full"></div>
@@ -694,13 +704,19 @@ export default function VideoSettings({
           ) : (
             <>
               <div className="logo-management-section">
+                {/* Componente para logos favoritos */}
+                <SavedLogos
+                  onSelectLogo={(logoId) => setSelectedLogoId(logoId)}
+                  selectedLogoId={selectedLogoId || undefined}
+                />
+
                 {/* Usamos el nuevo componente LogoManager que incluye la opción de eliminar */}
-                <LogoManager 
+                <LogoManager
                   onSelectLogo={(logoId) => setSelectedLogoId(logoId)}
                   selectedLogoId={selectedLogoId}
                 />
               </div>
-              
+
               {selectedLogoId && (
                 <div className="mt-4">
                   <label className="block text-sm font-medium mb-1">
@@ -740,14 +756,14 @@ export default function VideoSettings({
             </>
           )}
         </div>
-        
+
         {/* Título y texto */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold mb-2 flex items-center">
             <span className="mr-2">📝</span>
             Título en el Video
           </h3>
-          
+
           <div className="flex items-center mb-3">
             <input
               type="checkbox"
@@ -760,7 +776,7 @@ export default function VideoSettings({
               Mostrar texto en el video
             </label>
           </div>
-          
+
           {showTitle && (
             <>
               <div className="mb-3">
@@ -779,7 +795,7 @@ export default function VideoSettings({
                   Presiona Enter para agregar saltos de línea. Máximo 60 caracteres por línea.
                 </p>
               </div>
-              
+
               <div className="mb-3">
                 <label className="block text-sm font-medium mb-1">
                   Posición del título:
@@ -796,28 +812,26 @@ export default function VideoSettings({
                   </button>
                 </div>
               </div>
-              
+
               <div className="mb-3">
                 <p className="text-sm font-medium mb-2">Color del texto:</p>
                 <div className="grid grid-cols-8 gap-2">
                   {colors.map((color) => (
                     <button
                       key={color}
-                      className={`w-full h-8 rounded-md border-2 ${
-                        titleColor === color ? 'border-blue-500' : 'border-gray-300'
-                      }`}
+                      className={`w-full h-8 rounded-md border-2 ${titleColor === color ? 'border-blue-500' : 'border-gray-300'
+                        }`}
                       style={{ backgroundColor: color }}
                       onClick={() => setTitleColor(color)}
                       title={color}
                     >
                       {titleColor === color && (
-                        <Check 
-                          size={16} 
-                          className={`mx-auto ${
-                            ['#ffffff', '#00ff00', '#ffff00', '#00ffff'].includes(color) 
-                              ? 'text-black' 
-                              : 'text-white'
-                          }`} 
+                        <Check
+                          size={16}
+                          className={`mx-auto ${['#ffffff', '#00ff00', '#ffff00', '#00ffff'].includes(color)
+                            ? 'text-black'
+                            : 'text-white'
+                            }`}
                         />
                       )}
                     </button>
@@ -827,7 +841,7 @@ export default function VideoSettings({
             </>
           )}
         </div>
-        
+
         {/* Información de persistencia */}
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
           <p className="text-sm text-blue-700 flex items-center">
@@ -836,18 +850,18 @@ export default function VideoSettings({
           </p>
         </div>
       </div>
-      
+
       {/* Buttons - Back & Continue */}
       <div className="flex justify-between items-center">
-        <button 
+        <button
           className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center"
           onClick={onBack}
         >
           <span className="mr-1">←</span>
           Atrás
         </button>
-        
-        <button 
+
+        <button
           className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center"
           onClick={handleContinue}
         >

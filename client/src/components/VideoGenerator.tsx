@@ -147,9 +147,19 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
     }
   });
   
-  // Guardar configuración
-  const saveSettings = () => {
-    updateSettingsMutation.mutate({
+  // Mutation para actualizar el proyecto con las configuraciones
+  const updateProjectMutation = useMutation({
+    mutationFn: async (settings: any) => {
+      return apiRequest("PATCH", `/api/projects/${projectId}`, settings);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
+    }
+  });
+
+  // Guardar configuración (tanto en appSettings como en el proyecto)
+  const saveSettings = async () => {
+    const settings = {
       selectedLogoId,
       logoPosition,
       showTitle,
@@ -158,6 +168,17 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
       titleColor,
       titlePosition,
       updatedAt: new Date().toISOString()
+    };
+    
+    // Guardar en appSettings (global)
+    await updateSettingsMutation.mutateAsync(settings);
+    
+    // También guardar en el proyecto actual para que persista
+    await updateProjectMutation.mutateAsync(settings);
+    
+    toast({
+      title: "Configuración guardada",
+      description: "Los ajustes han sido guardados en el proyecto correctamente."
     });
   };
   

@@ -1242,7 +1242,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("Texto del título original:", JSON.stringify(titleText));
 
         // Verificar si el showTitle está activado
-        const showTitle = settingsToUse.showTitle !== false; // Por defecto true si no está definido
+        // Si showTitle es null o undefined, por defecto es true
+        // Si showTitle es false explícitamente, no mostrar título
+        const showTitle = settingsToUse.showTitle === null || settingsToUse.showTitle === undefined ? true : settingsToUse.showTitle;
 
         if (!showTitle || !titleText.trim()) {
           console.log("El título está desactivado o vacío, no se mostrará texto");
@@ -1287,8 +1289,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let safeTextDir = tempDir;
           if (process.platform === 'win32') {
             safeTextDir = 'C:\\ffmpeg_temp';
-            if (!fs.existsSync(safeTextDir)) {
-              fs.mkdirSync(safeTextDir, { recursive: true });
+            try {
+              if (!fs.existsSync(safeTextDir)) {
+                fs.mkdirSync(safeTextDir, { recursive: true });
+                console.log(`✅ Directorio creado: ${safeTextDir}`);
+              }
+            } catch (error) {
+              console.warn(`⚠️ No se pudo crear ${safeTextDir}, usando tempDir`, error);
+              safeTextDir = tempDir; // Fallback al tempDir si falla
             }
           }
           
@@ -1474,28 +1482,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Clean up any temp files
-        setTimeout(() => {
-          try {
-            // Clean up logo temp file if it exists
-            if (hasLogo && fs.existsSync(logoTempPath)) {
-              fs.unlinkSync(logoTempPath);
-            }
-            // Clean up text file if it exists
-            if (textfilePath && fs.existsSync(textfilePath)) {
-              fs.unlinkSync(textfilePath);
-            }
-            // Try to remove temp directory if it's empty
-            if (fs.existsSync(tempDir)) {
-              const files = fs.readdirSync(tempDir);
-              if (files.length === 0) {
-                fs.rmdirSync(tempDir);
-              }
-            }
-          } catch (e) {
-            console.warn("Error cleaning up temp files:", e);
+        // Clean up temp files AFTER video generation completes
+        // NO usar setTimeout aquí - limpiar después de que FFmpeg termine
+        try {
+          // Clean up logo temp file if it exists
+          if (hasLogo && fs.existsSync(logoTempPath)) {
+            fs.unlinkSync(logoTempPath);
           }
-        }, 2000);
+          // Clean up text file if it exists
+          if (textfilePath && fs.existsSync(textfilePath)) {
+            fs.unlinkSync(textfilePath);
+          }
+          // Try to remove temp directory if it's empty
+          if (fs.existsSync(tempDir)) {
+            const files = fs.readdirSync(tempDir);
+            if (files.length === 0) {
+              fs.rmdirSync(tempDir);
+            }
+          }
+        } catch (e) {
+          console.warn("Error cleaning up temp files:", e);
+        }
       } else if (uploadedVideos.length > 0) {
         // Procesar usando videos subidos (uno o múltiples)
         console.log(`Procesando con ${uploadedVideos.length} videos subidos`);

@@ -410,7 +410,7 @@ export default function Home() {
             <div>
               <h1 className="text-3xl font-semibold text-gray-900 flex items-center">
                 <span className="text-primary">Foto</span><span className="text-accent">To</span><span className="text-secondary">Video</span>
-                <span className="ml-2 text-sm text-gray-500">v1.1</span>
+                <span className="ml-2 text-sm text-gray-500">v1.2</span>
                 <Film className="ml-2 text-accent" />
               </h1>
               <p className="text-gray-600 mt-1">Crea videos a partir de tus fotos y texto</p>
@@ -535,7 +535,7 @@ export default function Home() {
         
         {/* Footer */}
         <footer className="mt-12 text-center text-gray-500 text-sm">
-          <p>&copy; {new Date().getFullYear()} FotoToVideo v1.1 - Create videos from photos and text</p>
+          <p>&copy; {new Date().getFullYear()} FotoToVideo v1.2 - Create videos from photos and text</p>
           <p className="mt-1">Powered by Eleven Labs API</p>
         </footer>
       </div>

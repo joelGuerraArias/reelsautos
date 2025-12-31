@@ -1568,7 +1568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.log(`Ajustando la duración del video para que coincida con el audio: ${audioDuration} segundos`);
 
               // Si el video es más corto que el audio, lo extendemos con loop
-              const command = `ffmpeg -y -i "${processedVideos[0]}" -stream_loop -1 -i "${processedVideos[0]}" -i "${mixedAudioPath}" -filter_complex "[0:v][1:v]concat=n=2:v=1:a=0[outv]" -map "[outv]" -map 2:a -c:v libx264 -c:a aac -t ${audioDuration} "${outputPath}"`;
+              const command = `ffmpeg -y -stream_loop -1 -i "${processedVideos[0]}" -i "${mixedAudioPath}" -map 0:v -map 1:a -c:v libx264 -c:a aac -shortest "${outputPath}"`;
               await execFFmpeg(command, "Combinar video con audio mezclado", 180000); // 3 minutos
 
               // Limpiar el archivo de audio mezclado
@@ -1581,7 +1581,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.log("Usando solo audio principal debido a error con música de fondo");
               const audioDuration = audio.duration || 0;
               // Si el video es más corto que el audio, lo extendemos con loop
-              const command = `ffmpeg -y -i "${processedVideos[0]}" -stream_loop -1 -i "${processedVideos[0]}" -i "${audio.filepath}" -filter_complex "[0:v][1:v]concat=n=2:v=1:a=0[outv]" -map "[outv]" -map 2:a -c:v libx264 -c:a aac -t ${audioDuration} "${outputPath}"`;
+              const command = `ffmpeg -y -stream_loop -1 -i "${processedVideos[0]}" -i "${audio.filepath}" -map 0:v -map 1:a -c:v libx264 -c:a aac -shortest "${outputPath}"`;
               await execFFmpeg(command, "Combinar video con audio (fallback)", 180000); // 3 minutos
             }
           } else {
@@ -1591,7 +1591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`Ajustando la duración del video para que coincida con el audio (sin música de fondo): ${audioDuration} segundos`);
 
             // Si el video es más corto que el audio, lo extendemos con loop
-            const command = `ffmpeg -y -i "${processedVideos[0]}" -stream_loop -1 -i "${processedVideos[0]}" -i "${audio.filepath}" -filter_complex "[0:v][1:v]concat=n=2:v=1:a=0[outv]" -map "[outv]" -map 2:a -c:v libx264 -c:a aac -t ${audioDuration} "${outputPath}"`;
+            const command = `ffmpeg -y -stream_loop -1 -i "${processedVideos[0]}" -i "${audio.filepath}" -map 0:v -map 1:a -c:v libx264 -c:a aac -shortest "${outputPath}"`;
             await execFFmpeg(command, "Combinar video con audio", 180000); // 3 minutos
           }
         } else {

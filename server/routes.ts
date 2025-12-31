@@ -1143,6 +1143,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const project = await storage.getProject(validatedData.projectId);
       const settingsToUse = (project?.titleText || project?.showTitle !== null) ? project : appSettings;
       console.log(`📋 Usando configuraciones de: ${settingsToUse === project ? 'Proyecto' : 'Global (appSettings)'}`);
+      console.log(`📋 Configuración completa:`, JSON.stringify({
+        showTitle: settingsToUse?.showTitle,
+        titleText: settingsToUse?.titleText,
+        titleFontSize: settingsToUse?.titleFontSize,
+        titleColor: settingsToUse?.titleColor,
+        titlePosition: settingsToUse?.titlePosition,
+        selectedLogoId: settingsToUse?.selectedLogoId,
+        logoPosition: settingsToUse?.logoPosition
+      }, null, 2));
 
       // Obtener el logo seleccionado de la base de datos de forma robusta
       let logoTempPath = '';
@@ -1239,17 +1248,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let titleText = settingsToUse.titleText || "";
 
         // Añadir debug para ver qué texto está llegando
-        console.log("Texto del título original:", JSON.stringify(titleText));
+        console.log("📝 Texto del título original:", JSON.stringify(titleText));
+        console.log("📝 showTitle value:", settingsToUse.showTitle);
+        console.log("📝 showTitle type:", typeof settingsToUse.showTitle);
 
         // Verificar si el showTitle está activado
         // Si showTitle es null o undefined, por defecto es true
         // Si showTitle es false explícitamente, no mostrar título
         const showTitle = settingsToUse.showTitle === null || settingsToUse.showTitle === undefined ? true : settingsToUse.showTitle;
+        console.log("📝 showTitle computed:", showTitle);
 
         if (!showTitle || !titleText.trim()) {
-          console.log("El título está desactivado o vacío, no se mostrará texto");
+          console.log(`❌ El título NO se mostrará - showTitle: ${showTitle}, titleText: "${titleText}"`);
           textOverlay = ""; // No mostrar texto
         } else {
+          console.log(`✅ El título SÍ se mostrará - showTitle: ${showTitle}, titleText: "${titleText}"`);
           // Procesar los saltos de línea del textarea (caracteres \n) 
           // y los marcados con [nl] a formato FFmpeg (\n)
           titleText = titleText.replace(/\n/g, '\\n').replace(/\[nl\]/g, '\\n');
@@ -1301,13 +1314,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           textfilePath = path.join(safeTextDir, `title_${nanoid()}.txt`);
-          
+
           // Convertir \\n a saltos de línea reales para el archivo
           const textForFile = titleText.replace(/\\n/g, '\n');
           fs.writeFileSync(textfilePath, textForFile, 'utf8');
-          
-          console.log(`📝 Texto guardado en archivo temporal: ${textfilePath}`);
-          console.log(`📝 Contenido del archivo: "${textForFile}"`);
+
+          console.log(`✅ Texto guardado en archivo temporal: ${textfilePath}`);
+          console.log(`✅ Contenido del archivo: "${textForFile}"`);
+          console.log(`✅ Archivo existe: ${fs.existsSync(textfilePath)}`);
 
           // Título con fondo negro que solo cubre el texto
           const textX = '(w-tw)/2'; // Centrado horizontal exacto
@@ -1337,7 +1351,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           textOverlay = `,drawtext=fontfile=${escapedFontPath}:textfile=${escapedTextfilePath}:fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=black@0.8:boxborderw=${boxBorderWidth}:line_spacing=15:borderw=2`;
 
           console.log(`✅ Aplicando título al video usando textfile`);
-          console.log(`📝 Comando drawtext: ${textOverlay.substring(0, 150)}...`);
+          console.log(`📝 Comando drawtext COMPLETO: ${textOverlay}`);
+          console.log(`📝 FontPath escapado: ${escapedFontPath}`);
+          console.log(`📝 TextfilePath escapado: ${escapedTextfilePath}`);
         }
       }
 
@@ -1348,21 +1364,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`\n📋 Generando video con 1 foto:`);
         console.log(`   - Tiene logo: ${hasLogo}`);
         console.log(`   - Tiene texto: ${textOverlay.length > 0}`);
+        console.log(`   - Longitud textOverlay: ${textOverlay.length}`);
         console.log(`   - Duración: ${audioDuration}s`);
+        if (textOverlay.length > 0) {
+          console.log(`   - Preview textOverlay: ${textOverlay.substring(0, 200)}...`);
+        }
 
         if (hasLogo) {
           // Si hay logo, usamos filtergraph complejo para manejar 2 entradas visuales (foto + logo)
           // Ajustamos el logo a un máximo de 64px de alto manteniendo la proporción
           // Separamos el textOverlay en una variable diferente para mejorar la estructura del comando
           const drawTextFilter = textOverlay ? textOverlay.replace(/^,/, '') : '';
-          console.log(`   - Filter text: ${drawTextFilter.substring(0, 100)}...`);
+          console.log(`   - Filter text: ${drawTextFilter.substring(0, 200)}...`);
+          console.log(`   - Filter text COMPLETO: ${drawTextFilter}`);
           // Agregamos optimizaciones de rendimiento: preset ultrafast, threads
           command = `ffmpeg -y -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1:1[base];[2:v]scale=-1:64,setsar=1:1[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -map 1:a -c:v libx264 -preset ultrafast -threads 0 -c:a aac -b:a 192k -pix_fmt yuv420p -r 30 -shortest "${outputPath}"`;
+          console.log(`🎬 Comando FFmpeg COMPLETO (con logo y texto): ${command}`);
         } else {
           // Sin logo, solo aplicamos texto si es necesario
           // Usamos scale=increase para llenar completamente el marco y crop para mantener proporciones
-          console.log(`   - Filter text (sin logo): ${textOverlay.substring(0, 100)}...`);
+          console.log(`   - Filter text (sin logo): ${textOverlay.substring(0, 200)}...`);
+          console.log(`   - Filter text (sin logo) COMPLETO: ${textOverlay}`);
           command = `ffmpeg -y -loop 1 -t ${audioDuration} -i "${photos[0].filepath}" -i "${audio.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1:1${textOverlay}" -c:v libx264 -preset ultrafast -threads 0 -c:a aac -b:a 192k -pix_fmt yuv420p -r 30 -shortest "${outputPath}"`;
+          console.log(`🎬 Comando FFmpeg COMPLETO (sin logo): ${command}`);
         }
 
         console.log("Generando video con una sola foto (modo optimizado)");

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { logger } from "./logger";
 
 const app = express();
 app.use(express.json());
@@ -72,5 +73,11 @@ app.use((req, res, next) => {
     host,
   }, () => {
     log(`serving on port ${port} (${host}) with increased timeout (10 minutes)`);
+    logger.success('SERVER', '🚀 Servidor iniciado', { 
+      port, 
+      host, 
+      platform: process.platform,
+      nodeVersion: process.version 
+    });
   });
 })();

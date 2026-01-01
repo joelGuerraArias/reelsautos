@@ -14,8 +14,10 @@ import VideoPreview from "@/components/VideoPreview";
 import ErrorDisplay from "@/components/ErrorDisplay";
 import SaveProjectDialog from "@/components/SaveProjectDialog";
 import ProjectsList from "@/components/ProjectsList";
+import LogViewer from "@/components/LogViewer";
+import VideoGallery from "@/components/VideoGallery";
 import { Photo, Audio, Video, ElevenLabsVoice, Project } from "@shared/schema";
-import { Film, Wand2, Settings, Save, FolderOpen, FilePlus, RotateCcw } from "lucide-react";
+import { Film, Wand2, Settings, Save, FolderOpen, FilePlus, RotateCcw, Bug, PlaySquare } from "lucide-react";
 import { Dialog, DialogTrigger, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,34 +41,36 @@ enum Step {
 
 export default function Home() {
   const { toast } = useToast();
-  
+
   // State variables
   const [currentStep, setCurrentStep] = useState<Step>(Step.UPLOAD_PHOTOS);
   const [projectId, setProjectId] = useState<string>(nanoid());
   const [error, setError] = useState<string | null>(null);
   const [selectedVideoIds, setSelectedVideoIds] = useState<number[]>([]);
-  
+  const [isLogViewerOpen, setIsLogViewerOpen] = useState(false);
+  const [isVideoGalleryOpen, setIsVideoGalleryOpen] = useState(false);
+
   // Queries for project data
   const photosQuery = useQuery({
     queryKey: [`/api/projects/${projectId}/photos`],
     enabled: !!projectId,
   });
-  
+
   const audioQuery = useQuery({
     queryKey: [`/api/projects/${projectId}/audio`],
     enabled: !!projectId,
   });
-  
+
   const videoQuery = useQuery({
     queryKey: [`/api/projects/${projectId}/video`],
     enabled: !!projectId,
   });
-  
+
   const uploadedVideosQuery = useQuery({
     queryKey: [`/api/projects/${projectId}/uploaded-videos`],
     enabled: !!projectId,
   });
-  
+
   // Obtener el proyecto actual
   const projectQuery = useQuery({
     queryKey: [`/api/projects/${projectId}`],
@@ -78,7 +82,7 @@ export default function Home() {
     queryKey: ['/api/templates/latest'],
     enabled: false // Lo activaremos cuando sea necesario
   });
-  
+
   // Create project mutation
   const createProjectMutation = useMutation({
     mutationFn: async (useTemplate: boolean = false) => {
@@ -87,11 +91,11 @@ export default function Home() {
         title: `Project ${new Date().toLocaleDateString()}`,
         createdAt: new Date().toISOString()
       };
-      
+
       // Si hay una plantilla y queremos usarla, copiar sus configuraciones
       if (useTemplate && templateQuery.data) {
         const template = templateQuery.data as Project;
-        
+
         // Copiar configuraciones relevantes de la plantilla al nuevo proyecto
         const projectWithConfig = {
           ...newProject,
@@ -107,10 +111,10 @@ export default function Home() {
           backgroundMusicVolume: template.backgroundMusicVolume,
           useUploadedVideo: template.useUploadedVideo
         };
-        
+
         Object.assign(newProject, projectWithConfig);
       }
-      
+
       return apiRequest('POST', '/api/projects', newProject);
     },
     onSuccess: () => {
@@ -120,7 +124,7 @@ export default function Home() {
       setError(error.message);
     }
   });
-  
+
   // Initialize project if it doesn't exist
   useEffect(() => {
     // Si estamos empezando y no se está creando un proyecto ni ha sido creado ya
@@ -137,12 +141,12 @@ export default function Home() {
       });
     }
   }, [createProjectMutation.isPending, createProjectMutation.isSuccess, projectQuery.data]);
-  
+
   // Navigation functions
   const goToNextStep = () => {
     // No validation needed - user can proceed without photos to upload video later
     // Skip validation to allow video upload option on next screen
-    
+
     if (currentStep === Step.CREATE_AUDIO && !audioQuery.data) {
       toast({
         title: "No audio generated",
@@ -151,25 +155,25 @@ export default function Home() {
       });
       return;
     }
-    
+
     setCurrentStep(prev => Math.min(prev + 1, Step.GENERATE_VIDEO) as Step);
   };
-  
+
   const goToPreviousStep = () => {
     setCurrentStep(prev => Math.max(prev - 1, Step.UPLOAD_PHOTOS) as Step);
   };
-  
+
   const startNewProject = () => {
     // Create a new project ID
     const newProjectId = nanoid();
     setProjectId(newProjectId);
-    
+
     // Reset to first step
     setCurrentStep(Step.UPLOAD_PHOTOS);
-    
+
     // Clear cached data
     queryClient.invalidateQueries();
-    
+
     // Intentar obtener la plantilla más reciente
     templateQuery.refetch().then(result => {
       if (result.data) {
@@ -179,14 +183,14 @@ export default function Home() {
         // No hay plantilla, crear proyecto sin ella
         createProjectMutation.mutate(false);
       }
-      
+
       toast({
         title: "Nuevo proyecto creado",
         description: "Puedes comenzar a subir fotos",
       });
     });
   };
-  
+
   const dismissError = () => {
     setError(null);
   };
@@ -201,26 +205,26 @@ export default function Home() {
               <span className="mr-2 text-primary"><Wand2 size={20} /></span>
               Subir Fotos o Video
             </h2>
-            
+
             <div className="bg-blue-50 p-4 mb-6 rounded-lg border border-blue-200">
               <p className="text-blue-800 font-medium mb-2">Sube tus archivos:</p>
               <p className="text-blue-700 text-sm">
-                Para crear tu video, puedes seleccionar entre subir fotos o un video usando las 
+                Para crear tu video, puedes seleccionar entre subir fotos o un video usando las
                 pestañas de arriba. Ambos métodos funcionan perfectamente para crear tu presentación.
               </p>
             </div>
-            
+
             <PhotoUploader projectId={projectId} />
-            
+
             {photosQuery.data && Array.isArray(photosQuery.data) && photosQuery.data.length > 0 && (
-              <PhotoPreviewList 
-                photos={photosQuery.data as Photo[]} 
-                projectId={projectId} 
+              <PhotoPreviewList
+                photos={photosQuery.data as Photo[]}
+                projectId={projectId}
               />
             )}
 
             <div className="flex justify-end mt-6">
-              <button 
+              <button
                 className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center"
                 onClick={goToNextStep}
               >
@@ -230,7 +234,7 @@ export default function Home() {
             </div>
           </div>
         );
-        
+
       case Step.CREATE_AUDIO:
         return (
           <div className="p-6 border-b border-gray-200">
@@ -238,24 +242,24 @@ export default function Home() {
               <span className="mr-2 text-primary"><Wand2 size={20} /></span>
               Generar Audio
             </h2>
-            
+
             {!audioQuery.data ? (
-              <AudioGenerator 
-                projectId={projectId} 
-                photos={photosQuery.data as Photo[]} 
+              <AudioGenerator
+                projectId={projectId}
+                photos={photosQuery.data as Photo[]}
                 onBack={goToPreviousStep}
               />
             ) : (
-              <AudioPreview 
-                audio={audioQuery.data as Audio} 
-                photos={photosQuery.data as Photo[]} 
+              <AudioPreview
+                audio={audioQuery.data as Audio}
+                photos={photosQuery.data as Photo[]}
                 onBack={goToPreviousStep}
                 onContinue={goToNextStep}
               />
             )}
           </div>
         );
-        
+
       case Step.CONFIGURE_VIDEO:
         return (
           <div className="p-6 border-b border-gray-200">
@@ -263,8 +267,8 @@ export default function Home() {
               <span className="mr-2 text-primary"><Settings size={20} /></span>
               Configurar Video
             </h2>
-            
-            <VideoSettings 
+
+            <VideoSettings
               projectId={projectId}
               photos={photosQuery.data as Photo[]}
               audio={audioQuery.data as Audio}
@@ -276,7 +280,7 @@ export default function Home() {
             />
           </div>
         );
-        
+
       case Step.GENERATE_VIDEO:
         return (
           <div className="p-6">
@@ -284,20 +288,20 @@ export default function Home() {
               <span className="mr-2 text-primary"><Film size={20} /></span>
               Generar Video
             </h2>
-            
+
             {!videoQuery.data ? (
-              <VideoGenerator 
-                projectId={projectId} 
-                photos={photosQuery.data as Photo[]} 
+              <VideoGenerator
+                projectId={projectId}
+                photos={photosQuery.data as Photo[]}
                 audio={audioQuery.data as Audio}
                 onBack={goToPreviousStep}
                 uploadedVideos={uploadedVideosQuery.data as any[]}
                 selectedVideoIds={selectedVideoIds}
               />
             ) : (
-              <VideoPreview 
-                video={videoQuery.data as Video} 
-                photos={photosQuery.data as Photo[]} 
+              <VideoPreview
+                video={videoQuery.data as Video}
+                photos={photosQuery.data as Photo[]}
                 audio={audioQuery.data as Audio}
                 onBack={goToPreviousStep}
                 onNewProject={startNewProject}
@@ -306,7 +310,7 @@ export default function Home() {
             )}
           </div>
         );
-        
+
       default:
         return null;
     }
@@ -317,7 +321,7 @@ export default function Home() {
   const [isProjectsListOpen, setIsProjectsListOpen] = useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [projectTitle, setProjectTitle] = useState<string | undefined>(undefined);
-  
+
   // Handler for saving a project
   const handleSaveProject = (savedProjectId: string) => {
     toast({
@@ -325,58 +329,70 @@ export default function Home() {
       description: "El proyecto se ha guardado correctamente"
     });
     setIsSaveDialogOpen(false);
-    
+
     // Actualizar la información del proyecto para reflejar el título
     queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
   };
-  
+
   // Handler for selecting a project from the list
   const handleSelectProject = (selectedProjectId: string) => {
     if (selectedProjectId === projectId) {
       setIsProjectsListOpen(false);
       return;
     }
-    
+
     setProjectId(selectedProjectId);
     setIsProjectsListOpen(false);
-    
+
     // Invalidate queries to refresh data
     queryClient.invalidateQueries();
-    
+
     // Start at the first step
     setCurrentStep(Step.UPLOAD_PHOTOS);
-    
+
     toast({
       title: "Proyecto cargado",
       description: "El proyecto se ha cargado correctamente"
     });
   };
-  
+
   // Handler for resetting a project
-  const handleResetProject = (resetProjectId: string) => {
+  const handleResetProject = async (resetProjectId: string) => {
     // Si es el proyecto actual, actualizar la UI
     if (resetProjectId === projectId) {
-      // Invalidar todas las consultas para el proyecto
-      queryClient.invalidateQueries();
-      
-      // Volver al primer paso
-      setCurrentStep(Step.UPLOAD_PHOTOS);
-      
-      setIsProjectsListOpen(false);
-      
-      toast({
-        title: "Proyecto reiniciado",
-        description: "El proyecto ha sido reiniciado correctamente"
-      });
+      try {
+        // Llamar al endpoint de reset en el backend
+        await apiRequest("POST", `/api/projects/${projectId}/reset`);
+
+        // Invalidar todas las consultas para el proyecto
+        queryClient.invalidateQueries();
+
+        // Volver al primer paso
+        setCurrentStep(Step.UPLOAD_PHOTOS);
+
+        setIsProjectsListOpen(false);
+
+        toast({
+          title: "Proyecto reiniciado",
+          description: "El proyecto ha sido reiniciado correctamente. Puedes generar nuevo audio."
+        });
+      } catch (error) {
+        console.error("Error al reiniciar proyecto:", error);
+        toast({
+          title: "Error",
+          description: "No se pudo reiniciar el proyecto completamente",
+          variant: "destructive"
+        });
+      }
     }
   };
-  
+
   // Get project title for display and load project settings if they exist
   useEffect(() => {
     if (projectQuery.data) {
       const project = projectQuery.data as Project;
       setProjectTitle(project.title);
-      
+
       // Si el proyecto tiene configuraciones guardadas, cargarlas en appSettings
       if (project.titleText || project.showTitle !== null || project.selectedLogoId) {
         console.log("Cargando configuraciones del proyecto en appSettings...");
@@ -415,41 +431,61 @@ export default function Home() {
               </h1>
               <p className="text-gray-600 mt-1">Crea videos a partir de tus fotos y texto</p>
             </div>
-            
+
             <div className="flex items-center space-x-3 mt-4 md:mt-0">
               <div className="text-sm font-medium text-gray-600 mr-2">
                 {projectTitle || "Proyecto sin guardar"}
               </div>
-              
-              <Button 
-                variant="outline" 
+
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => setIsSaveDialogOpen(true)}
               >
                 <Save className="mr-2 h-4 w-4" />
                 Guardar
               </Button>
-              
-              <Button 
-                variant="outline" 
+
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => setIsProjectsListOpen(true)}
               >
                 <FolderOpen className="mr-2 h-4 w-4" />
                 Abrir
               </Button>
-              
-              <Button 
-                variant="outline" 
+
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={startNewProject}
               >
                 <FilePlus className="mr-2 h-4 w-4" />
                 Nuevo
               </Button>
-              
-              <Button 
-                variant="destructive" 
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsVideoGalleryOpen(true)}
+                className="bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-700"
+              >
+                <PlaySquare className="mr-2 h-4 w-4" />
+                Videos
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsLogViewerOpen(true)}
+                className="bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700"
+              >
+                <Bug className="mr-2 h-4 w-4" />
+                Logs
+              </Button>
+
+              <Button
+                variant="destructive"
                 size="sm"
                 onClick={() => setIsResetDialogOpen(true)}
                 className="bg-red-600 hover:bg-red-700 border-2 border-red-800"
@@ -460,20 +496,20 @@ export default function Home() {
             </div>
           </div>
         </header>
-        
+
         {/* Save Project Dialog */}
-        <SaveProjectDialog 
+        <SaveProjectDialog
           isOpen={isSaveDialogOpen}
           onClose={() => setIsSaveDialogOpen(false)}
           onSaved={handleSaveProject}
           projectId={projectId}
           currentTitle={projectTitle}
         />
-        
+
         {/* Projects List Dialog */}
         <Dialog open={isProjectsListOpen} onOpenChange={setIsProjectsListOpen}>
           <DialogContent className="sm:max-w-[800px]">
-            <ProjectsList 
+            <ProjectsList
               onSelectProject={handleSelectProject}
               onCreateNewProject={() => {
                 startNewProject();
@@ -485,7 +521,7 @@ export default function Home() {
             />
           </DialogContent>
         </Dialog>
-        
+
         {/* Reset Confirmation Dialog */}
         <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
           <AlertDialogContent>
@@ -504,7 +540,7 @@ export default function Home() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction 
+              <AlertDialogAction
                 onClick={() => {
                   handleResetProject(projectId);
                   setIsResetDialogOpen(false);
@@ -526,19 +562,35 @@ export default function Home() {
           <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
             {renderStepContent()}
           </div>
-          
+
           {/* Error Display */}
           {error && (
             <ErrorDisplay error={error} onDismiss={dismissError} />
           )}
         </main>
-        
+
         {/* Footer */}
         <footer className="mt-12 text-center text-gray-500 text-sm">
           <p>&copy; {new Date().getFullYear()} FotoToVideo v1.2 - Create videos from photos and text</p>
           <p className="mt-1">Powered by Eleven Labs API</p>
         </footer>
       </div>
+
+      {/* Log Viewer Modal */}
+      <LogViewer
+        isOpen={isLogViewerOpen}
+        onClose={() => setIsLogViewerOpen(false)}
+      />
+
+      {/* Video Gallery Modal */}
+      <VideoGallery
+        isOpen={isVideoGalleryOpen}
+        onClose={() => setIsVideoGalleryOpen(false)}
+        onSelectProject={(id) => {
+          setProjectId(id);
+          setIsVideoGalleryOpen(false);
+        }}
+      />
     </div>
   );
 }

@@ -292,11 +292,17 @@ export default function VideoGenerator({ projectId, photos, audio, onBack, uploa
     },
     onError: (error: Error) => {
       setIsGenerating(false);
+      // Refetch video anyway - the alternative method might have generated it
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/video`] });
       toast({
         title: "Error en la generación",
-        description: error.message,
+        description: error.message + " - Verificando si el video fue generado...",
         variant: "destructive"
       });
+      // Retry fetch after a short delay
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/video`] });
+      }, 2000);
     }
   });
   

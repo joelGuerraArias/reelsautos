@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { logger } from "./logger";
 import fs from "fs";
 import path from "path";
 import multer from "multer";
@@ -30,50 +31,60 @@ const execSync = child_process.execSync;
 // Función para obtener la ruta de una fuente según el sistema operativo
 function getFontPath(): string {
   const platform = process.platform;
-  
+
   if (platform === 'win32') {
-    // Windows - usar Arial con barras normales (FFmpeg las acepta en Windows)
-    return 'C:/Windows/Fonts/arial.ttf';
+    // Windows - usar Arial Bold
+    return 'C:/Windows/Fonts/arialbd.ttf';
   } else if (platform === 'darwin') {
-    // macOS - usar Helvetica
-    return '/System/Library/Fonts/Helvetica.ttc';
+    // macOS - usar Helvetica Bold
+    return '/System/Library/Fonts/Helvetica-Bold.ttc';
   } else {
-    // Linux - usar DejaVu Sans
+    // Linux - usar DejaVu Sans Bold
     return '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
   }
 }
 
 // Función mejorada para ejecutar FFmpeg con timeout y logging
-async function execFFmpeg(command: string, description: string, timeoutMs: number = 300000) {
+async function execFFmpeg(command: string, description: string, timeoutMs: number = 600000) {
+  logger.info('FFMPEG', `⏳ Iniciando: ${description}`, { timeout: `${timeoutMs / 1000}s` });
   console.log(`\n🎬 [FFmpeg] ${description}`);
   console.log(`⏱️  Timeout: ${timeoutMs / 1000}s`);
-  console.log(`📝 Comando: ${command.substring(0, 150)}...`);
-  
+  console.log(`📝 Comando: ${command.substring(0, 200)}...`);
+
   const startTime = Date.now();
-  
+
   try {
-    const result = await exec(command, { 
-      maxBuffer: 50 * 1024 * 1024, // 50MB buffer
-      timeout: timeoutMs 
+    const result = await exec(command, {
+      maxBuffer: 100 * 1024 * 1024, // 100MB buffer (aumentado)
+      timeout: timeoutMs
     });
-    
+
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    logger.success('FFMPEG', `✅ ${description} completado`, { duration: `${duration}s` });
     console.log(`✅ [FFmpeg] ${description} completado en ${duration}s`);
-    
+
     if (result.stderr) {
       console.log(`⚠️  FFmpeg stderr: ${result.stderr.substring(0, 200)}`);
     }
-    
+
     return result;
   } catch (error: any) {
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    const isTimeout = error.killed || error.message.includes('ETIMEDOUT');
+
+    logger.error('FFMPEG', `❌ Error en ${description}`, {
+      duration: `${duration}s`,
+      isTimeout,
+      error: error.message.substring(0, 200)
+    });
+
     console.error(`❌ [FFmpeg] Error en ${description} después de ${duration}s`);
     console.error(`Error: ${error.message}`);
     if (error.stderr) {
-      console.error(`FFmpeg stderr: ${error.stderr}`);
+      console.error(`FFmpeg stderr: ${error.stderr.substring(0, 500)}`);
     }
     if (error.stdout) {
-      console.error(`FFmpeg stdout: ${error.stdout}`);
+      console.error(`FFmpeg stdout: ${error.stdout.substring(0, 500)}`);
     }
     throw error;
   }
@@ -415,8 +426,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/photos", photoUpload.single("photo"), async (req, res) => {
     try {
       if (!req.file) {
+        logger.warn('PHOTO', 'Intento de upload sin archivo');
         return res.status(400).json({ error: "No file uploaded" });
       }
+
+      logger.info('PHOTO', '📷 Subiendo foto', {
+        filename: req.file.originalname,
+        size: (req.file.size / 1024).toFixed(2) + ' KB'
+      });
 
       const photoData = {
         filename: req.file.originalname,
@@ -430,12 +447,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const parsedData = insertPhotoSchema.parse(photoData);
       const photo = await storage.createPhoto(parsedData);
+
+      logger.success('PHOTO', '✅ Foto subida', { photoId: photo.id, filename: photo.filename });
       res.status(201).json(photo);
     } catch (error) {
       // Clean up the file on error
       if (req.file) {
         fs.unlinkSync(req.file.path);
       }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('PHOTO', 'Error al subir foto', { error: errorMessage });
 
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
@@ -508,17 +530,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Generate audio from text using Eleven Labs API
   app.post("/api/audios", async (req, res) => {
+    logger.info('AUDIO', '🎤 Iniciando generación de audio');
+
     try {
       const validatedData = generateAudioSchema.parse(req.body);
       const { text, voice, projectId } = validatedData;
+
+      logger.info('AUDIO', 'Datos validados', { voiceId: voice, textLength: text.length });
 
       // Call Eleven Labs API to generate audio
       const apiKey = process.env.ELEVENLABS_API_KEY;
 
       if (!apiKey) {
+        logger.error('AUDIO', 'API Key de ElevenLabs no configurada');
         return res.status(500).json({ error: "Eleven Labs API key not configured" });
       }
 
+      logger.info('AUDIO', 'Llamando a ElevenLabs API...');
       const response = await axios.post(
         `https://api.elevenlabs.io/v1/text-to-speech/${voice}`,
         {
@@ -538,16 +566,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           responseType: "arraybuffer"
         }
       );
+      logger.success('AUDIO', 'Respuesta de ElevenLabs recibida');
 
       // Save the audio file
       const filename = `audio_${nanoid()}.mp3`;
       const filepath = path.join(AUDIO_DIR, filename);
 
       fs.writeFileSync(filepath, response.data);
+      logger.info('AUDIO', 'Archivo de audio guardado', { filename });
 
       // Get audio duration using FFmpeg
       const { stdout } = await exec(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filepath}"`);
       const duration = Math.round(parseFloat(stdout.trim()));
+      logger.info('AUDIO', 'Duración calculada', { duration: duration + 's' });
 
       // Save audio record
       const audioData = {
@@ -563,9 +594,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parsedData = insertAudioSchema.parse(audioData);
       const audio = await storage.createAudio(parsedData);
 
+      logger.success('AUDIO', '✅ Audio generado exitosamente', { audioId: audio.id, duration: duration + 's' });
       res.status(201).json(audio);
     } catch (error) {
-      console.error("Audio generation error:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('AUDIO', 'Error en generación de audio', { error: errorMessage });
 
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
@@ -730,8 +763,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Validation error:", validationError.message);
         res.status(400).json({ error: validationError.message });
       } else {
-        console.error("General error:", error.message);
-        res.status(500).json({ error: error.message || "Failed to upload logo" });
+        const err = error as Error;
+        console.error("General error:", err.message);
+        res.status(500).json({ error: err.message || "Failed to upload logo" });
       }
     }
   });
@@ -1016,8 +1050,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all videos
+  app.get("/api/videos", async (req, res) => {
+    try {
+      const videos = await storage.getAllVideos();
+      res.json(videos);
+    } catch (error) {
+      logger.error('VIDEO', 'Error al obtener videos', { error: (error as Error).message });
+      res.status(500).json({ error: "Failed to get videos" });
+    }
+  });
+
   // Generate video from photos and audio
   app.post("/api/videos", async (req, res) => {
+    const startTime = Date.now();
+    logger.info('VIDEO', '🎬 Iniciando generación de video', { projectId: req.body.projectId });
+
     try {
       const validatedData = generateVideoSchema.parse(req.body);
       const {
@@ -1030,16 +1078,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projectId
       } = validatedData;
 
+      logger.info('VIDEO', 'Datos validados', {
+        photoCount: photoIds?.length || 0,
+        audioId,
+        hasBackgroundMusic: !!backgroundMusicId
+      });
+
       // Get the audio
       const audio = await storage.getAudio(audioId);
       if (!audio) {
+        logger.error('VIDEO', 'Audio no encontrado', { audioId });
         return res.status(404).json({ error: "Audio not found" });
       }
+      logger.success('VIDEO', 'Audio cargado', { duration: audio.duration });
 
       // Verificar si estamos procesando fotos o videos subidos
-      let photos = [];
-      let uploadedVideo = null;
-      let uploadedVideos = [];
+      let photos: any[] = [];
+      let uploadedVideo: any = null;
+      let uploadedVideos: any[] = [];
 
       if (photoIds && photoIds.length > 0) {
         // Procesar con fotos
@@ -1239,13 +1295,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Prepare text overlay - VERSIÓN ROBUSTA PARA WINDOWS
+      // Prepare text overlay - MÉTODO SIMPLIFICADO (basado en webtohook2.py)
       let textOverlay = '';
-      let textfilePath = ''; // Para guardar archivo temporal de texto si es necesario
-      
+
       if (settingsToUse) {
         // Usar exactamente el texto que el usuario ha configurado
-        let titleText = settingsToUse.titleText || "";
+        let titleText = (settingsToUse.titleText || "").trim().replace(/\r/g, '');
 
         // Añadir debug para ver qué texto está llegando
         console.log("📝 Texto del título original:", JSON.stringify(titleText));
@@ -1297,67 +1352,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log("Texto dividido en dos líneas:", titleText);
           }
 
-          // SOLUCIÓN DEFINITIVA: Guardar archivo de texto en ubicación SIN ESPACIOS
-          // Usamos C:\temp en Windows para evitar problemas con rutas que contienen espacios
-          let safeTextDir = tempDir;
-          if (process.platform === 'win32') {
-            safeTextDir = 'C:\\ffmpeg_temp';
-            try {
-              if (!fs.existsSync(safeTextDir)) {
-                fs.mkdirSync(safeTextDir, { recursive: true });
-                console.log(`✅ Directorio creado: ${safeTextDir}`);
-              }
-            } catch (error) {
-              console.warn(`⚠️ No se pudo crear ${safeTextDir}, usando tempDir`, error);
-              safeTextDir = tempDir; // Fallback al tempDir si falla
-            }
-          }
-          
-          textfilePath = path.join(safeTextDir, `title_${nanoid()}.txt`);
+          // Ya no necesitamos archivo temporal - usamos texto directo en el comando
+          console.log(`✅ Usando texto directo en el comando FFmpeg (sin archivo temporal)`);
 
-          // Convertir \\n a saltos de línea reales para el archivo
-          const textForFile = titleText.replace(/\\n/g, '\n');
-          fs.writeFileSync(textfilePath, textForFile, 'utf8');
+          // MÉTODO SIMPLIFICADO basado en webtohook2.py que funciona
+          // Escapar caracteres especiales en el texto para FFmpeg
+          let escapedText = titleText
+            .replace(/'/g, "'\\''")  // Escapar comillas simples
+            .replace(/:/g, '\\:')    // Escapar dos puntos
+            .replace(/\\/g, '\\\\'); // Escapar backslashes
 
-          console.log(`✅ Texto guardado en archivo temporal: ${textfilePath}`);
-          console.log(`✅ Contenido del archivo: "${textForFile}"`);
-          console.log(`✅ Archivo existe: ${fs.existsSync(textfilePath)}`);
-
-          // Título con fondo negro que solo cubre el texto
-          const textX = '(w-tw)/2'; // Centrado horizontal exacto
-          const textY = 'h-th-150'; // Posición a 150px del borde inferior
-          const boxBorderWidth = 10; // Borde para mejor visibilidad
-          
-          // Obtener la ruta de la fuente según el sistema operativo
-          const fontPath = getFontPath();
-          
-          // En Windows, las rutas deben usar / en lugar de \ y escapar :
-          const normalizedFontPath = fontPath.replace(/\\/g, '/');
-          const escapedFontPath = process.platform === 'win32' 
-            ? normalizedFontPath.replace(/:/g, '\\:')
-            : normalizedFontPath;
-          
-          // La ruta del textfile está en C:\ffmpeg_temp (sin espacios)
-          const normalizedTextfilePath = textfilePath.replace(/\\/g, '/');
-          const escapedTextfilePath = process.platform === 'win32'
-            ? normalizedTextfilePath.replace(/:/g, '\\:')
-            : normalizedTextfilePath;
-          
-          console.log(`📝 Fuente: ${fontPath} -> ${escapedFontPath}`);
-          console.log(`📝 Textfile: ${textfilePath} -> ${escapedTextfilePath}`);
+          console.log(`📝 Texto escapado: ${escapedText}`);
           console.log(`📝 Tamaño de fuente: ${fontSize}px`);
 
-          // Usar textfile - la ruta ahora está en una ubicación sin espacios
-          textOverlay = `,drawtext=fontfile=${escapedFontPath}:textfile=${escapedTextfilePath}:fontcolor=white:fontsize=${fontSize}:x=${textX}:y=${textY}:box=1:boxcolor=black@0.8:boxborderw=${boxBorderWidth}:line_spacing=15:borderw=2`;
+          // Usar el método simple de webtohook2.py pero con fuente específica
+          const fontPath = getFontPath().replace(/:/g, '\\:');
+          // Posición: centrado horizontal, cerca del borde inferior
+          textOverlay = `,drawtext=fontfile='${fontPath}':text='${escapedText}':fontcolor=white:fontsize=${fontSize}:box=1:boxcolor=black@0.5:boxborderw=10:x=(w-text_w)/2:y=h-(text_h*1.2)-60`;
 
-          console.log(`✅ Aplicando título al video usando textfile`);
-          console.log(`📝 Comando drawtext COMPLETO: ${textOverlay}`);
-          console.log(`📝 FontPath escapado: ${escapedFontPath}`);
-          console.log(`📝 TextfilePath escapado: ${escapedTextfilePath}`);
+          console.log(`✅ Aplicando título al video (método simplificado)`);
+          console.log(`📝 Comando drawtext: ${textOverlay}`);
         }
       }
 
-       if (photos.length === 1 && photos[0]) {
+      if (photos.length === 1 && photos[0]) {
         // Para una sola foto, generamos video a partir de imagen estática con audio y overlays
         let command;
 
@@ -1390,121 +1408,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         console.log("Generando video con una sola foto (modo optimizado)");
-        await execFFmpeg(command, "Generar video con 1 foto", 300000); // 5 minutos
+        await execFFmpeg(command, "Generar video con 1 foto", 900000); // 15 minutos
       } else if (photos.length > 1) {
-        // Para múltiples fotos, crear un slideshow con duración igual para cada foto
-        // Optimización: usar un filtergraph complejo en lugar de procesar cada foto por separado
+        // MÉTODO RÁPIDO: Procesar cada foto por separado y concatenar
+        // Este método es mucho más rápido que usar filter_complex con múltiples inputs
+        logger.info('VIDEO', `🚀 Generando video con ${photos.length} fotos (método rápido)`);
 
-        // Preparar filtros para cada foto
-        const filterComplex = [];
-        const photoFilters = [];
+        // VERIFICAR que todos los archivos existen
+        const missingFiles: string[] = [];
+        for (const photo of photos) {
+          if (!fs.existsSync(photo.filepath)) {
+            missingFiles.push(`Foto: ${photo.filepath}`);
+          }
+        }
+        if (!fs.existsSync(audio.filepath)) {
+          missingFiles.push(`Audio: ${audio.filepath}`);
+        }
+        if (hasLogo && !fs.existsSync(logoTempPath)) {
+          missingFiles.push(`Logo: ${logoTempPath}`);
+        }
 
-        // Preparar inputs para FFmpeg
-        let inputArgs = '';
+        if (missingFiles.length > 0) {
+          logger.error('VIDEO', 'Archivos faltantes', { missingFiles });
+          throw new Error(`Archivos no encontrados: ${missingFiles.join(', ')}`);
+        }
 
+        // PASO 1: Procesar cada foto individualmente (muy rápido: ~0.3s por foto)
+        const concatContent = [];
         for (let i = 0; i < photos.length; i++) {
           const photo = photos[i];
           if (photo && photo.filepath) {
-            // Añadir input de foto
-            inputArgs += ` -loop 1 -t ${photoDuration} -i "${photo.filepath}"`;
-
-            // Escalar y recortar la imagen a 1280x720 con setsar para compatibilidad
-            filterComplex.push(`[${i}:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1:1[v${i}]`);
-
-            // Añadir al array de "named" streams
-            photoFilters.push(`[v${i}]`);
+            const tempOutput = path.join(tempDir, `temp_${i}.mp4`);
+            const basicCommand = `ffmpeg -y -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1:1" -c:v libx264 -preset ultrafast -threads 0 -pix_fmt yuv420p -r 30 "${tempOutput}"`;
+            await execFFmpeg(basicCommand, `Foto ${i + 1}/${photos.length}`, 30000); // 30 segundos max
+            concatContent.push(tempOutput);
           }
         }
 
-        // Si hay logo, añadir como input
-        if (hasLogo) {
-          inputArgs += ` -i "${logoTempPath}"`;
-          const logoIdx = photos.length;
-          filterComplex.push(`[${logoIdx}:v]scale=-1:64[logo]`);
+        if (concatContent.length === 0) {
+          throw new Error("No se pudo procesar ninguna foto");
         }
 
-        // Concatenar las fotos escaladas
-        const photoChain = photoFilters.join('');
-        filterComplex.push(`${photoChain}concat=n=${photoFilters.length}:v=1:a=0[vbase]`);
+        // PASO 2: Concatenar videos (muy rápido: ~0.3s)
+        const concatFilePath = path.join(tempDir, 'concat_list.txt');
+        const concatListContent = concatContent.map(file => `file '${file}'`).join('\n');
+        fs.writeFileSync(concatFilePath, concatListContent);
 
-        // Aplicar logo y texto si es necesario
+        const tempVideoOutput = path.join(tempDir, 'temp_video_output.mp4');
+        const concatCommand = `ffmpeg -y -f concat -safe 0 -i "${concatFilePath}" -c:v copy "${tempVideoOutput}"`;
+        await execFFmpeg(concatCommand, "Concatenar", 30000);
+
+        // PASO 3: Combinar con audio (muy rápido: ~0.3s)
+        const tempWithAudio = path.join(tempDir, 'temp_with_audio.mp4');
+        const audioCommand = `ffmpeg -y -i "${tempVideoOutput}" -i "${audio.filepath}" -c:v copy -c:a aac -b:a 192k -shortest "${tempWithAudio}"`;
+        await execFFmpeg(audioCommand, "Añadir audio", 30000);
+
+        // PASO 4: Agregar logo y/o título si existen
+        let currentVideo = tempWithAudio;
+
         if (hasLogo) {
-          if (textOverlay) {
-            const drawTextFilter = textOverlay.replace(/^,/, '');
-            filterComplex.push(`[vbase][logo]overlay=${logoX}:${logoY}[withlogo];[withlogo]${drawTextFilter}[outv]`);
-          } else {
-            filterComplex.push(`[vbase][logo]overlay=${logoX}:${logoY}[outv]`);
-          }
-        } else if (textOverlay) {
+          const tempWithLogo = path.join(tempDir, 'temp_with_logo.mp4');
+          const logoCommand = `ffmpeg -y -i "${currentVideo}" -i "${logoTempPath}" -filter_complex "[1:v]scale=-1:64[logo];[0:v][logo]overlay=${logoX}:${logoY}" -c:v libx264 -preset ultrafast -c:a copy "${tempWithLogo}"`;
+          await execFFmpeg(logoCommand, "Añadir logo", 60000);
+          if (fs.existsSync(currentVideo) && currentVideo !== tempWithAudio) fs.unlinkSync(currentVideo);
+          currentVideo = tempWithLogo;
+        }
+
+        if (textOverlay) {
           const drawTextFilter = textOverlay.replace(/^,/, '');
-          filterComplex.push(`[vbase]${drawTextFilter}[outv]`);
+          const titleCommand = `ffmpeg -y -i "${currentVideo}" -vf "${drawTextFilter}" -c:v libx264 -preset ultrafast -c:a copy "${outputPath}"`;
+          await execFFmpeg(titleCommand, "Añadir título", 60000);
+          logger.success('VIDEO', 'Título agregado');
         } else {
-          filterComplex.push(`[vbase]copy[outv]`);
+          // Sin título, copiar el video final
+          fs.copyFileSync(currentVideo, outputPath);
         }
 
-        // Construir el comando FFmpeg optimizado
-        const allFilters = filterComplex.join(';');
-        // Corregir el índice del audio para el mapeo
-        const audioIndex = photos.length + (hasLogo ? 1 : 0);
-        // Asegurar que usamos el formato correcto para el -map
-        // Agregamos optimizaciones de rendimiento: preset ultrafast, threads
-        let command = `ffmpeg -y${inputArgs} -i "${audio.filepath}" -filter_complex "${allFilters}" -map "[outv]" -map ${audioIndex}:a -c:v libx264 -preset ultrafast -threads 0 -c:a aac -b:a 192k -pix_fmt yuv420p -r 30 -shortest "${outputPath}"`;
-
-        console.log("Comando FFmpeg optimizado para múltiples fotos");
-
-        try {
-          await execFFmpeg(command, `Generar video con ${photos.length} fotos`, 300000); // 5 minutos
-        } catch (execError) {
-          console.error("Error en la ejecución del comando FFmpeg:", execError);
-          // Intentar con un enfoque alternativo si el primer método falla
-          console.log("Intentando método alternativo...");
-
-          // Método alternativo: procesar cada imagen por separado y luego concatenar (el enfoque original)
-          const concatContent = [];
-
-          for (let i = 0; i < photos.length; i++) {
-            const photo = photos[i];
-            if (photo && photo.filepath) {
-              // Crear un segmento de imagen estática con overlay básico
-              const tempOutput = path.join(tempDir, `temp_${i}.mp4`);
-              // Usar preset ultrafast para acelerar la codificación
-              const basicCommand = `ffmpeg -y -loop 1 -t ${photoDuration} -i "${photo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1:1" -c:v libx264 -preset ultrafast -threads 0 -pix_fmt yuv420p -r 30 "${tempOutput}"`;
-
-              await execFFmpeg(basicCommand, `Procesar foto ${i + 1}/${photos.length}`, 120000); // 2 minutos por foto
-              concatContent.push(tempOutput);
-            }
-          }
-
-          if (concatContent.length > 0) {
-            // Crear el archivo de lista para concat
-            const concatFilePath = path.join(tempDir, 'concat_list.txt');
-            const concatListContent = concatContent.map(file => `file '${file}'`).join('\n');
-            fs.writeFileSync(concatFilePath, concatListContent);
-
-            // Crear output file sin audio - utilizando recodificación para mayor compatibilidad
-            const tempVideoOutput = path.join(tempDir, 'temp_video_output.mp4');
-            // En lugar de usar copy, recodificamos con parámetros optimizados para asegurar compatibilidad
-            const concatCommand = `ffmpeg -y -f concat -safe 0 -i "${concatFilePath}" -c:v libx264 -preset ultrafast -threads 0 -pix_fmt yuv420p -r 30 -vsync 1 "${tempVideoOutput}"`;
-            console.log("Usando método alternativo con recodificación para asegurar compatibilidad");
-            await execFFmpeg(concatCommand, "Concatenar fotos", 180000); // 3 minutos
-
-            // Añadir audio al video final
-            console.log("Combinando video con audio");
-            const finalCommand = `ffmpeg -y -i "${tempVideoOutput}" -i "${audio.filepath}" -c:v copy -c:a aac -b:a 192k -shortest "${outputPath}"`;
-            await execFFmpeg(finalCommand, "Combinar video con audio", 120000); // 2 minutos
-
-            // Limpiar archivos temporales
-            for (const tempFile of concatContent) {
-              if (fs.existsSync(tempFile)) {
-                fs.unlinkSync(tempFile);
-              }
-            }
-            fs.unlinkSync(concatFilePath);
-            fs.unlinkSync(tempVideoOutput);
-          } else {
-            throw new Error("No se pudo procesar ninguna foto con el método alternativo");
-          }
+        // Limpiar archivos temporales
+        for (const tempFile of concatContent) {
+          if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
         }
+        if (fs.existsSync(concatFilePath)) fs.unlinkSync(concatFilePath);
+        if (fs.existsSync(tempVideoOutput)) fs.unlinkSync(tempVideoOutput);
+        if (fs.existsSync(tempWithAudio)) fs.unlinkSync(tempWithAudio);
+        if (currentVideo !== tempWithAudio && fs.existsSync(currentVideo)) fs.unlinkSync(currentVideo);
+
+        logger.success('VIDEO', 'Video generado con método rápido');
 
         // Clean up temp files AFTER video generation completes
         // NO usar setTimeout aquí - limpiar después de que FFmpeg termine
@@ -1512,10 +1501,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Clean up logo temp file if it exists
           if (hasLogo && fs.existsSync(logoTempPath)) {
             fs.unlinkSync(logoTempPath);
-          }
-          // Clean up text file if it exists
-          if (textfilePath && fs.existsSync(textfilePath)) {
-            fs.unlinkSync(textfilePath);
           }
           // Try to remove temp directory if it's empty
           if (fs.existsSync(tempDir)) {
@@ -1553,16 +1538,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Usar comillas dobles para escapar el texto dentro del comando FFmpeg
             // Añadimos flags para asegurar compatibilidad entre videos
             const processVideoCommand = `ffmpeg -y -i "${currentVideo.filepath}" -i "${logoTempPath}" -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1:1[base];[1:v]scale=-1:64,setsar=1:1[logo];[base][logo]overlay=${logoX}:${logoY}[vbase];[vbase]${drawTextFilter}[outv]" -map "[outv]" -c:v libx264 -preset ultrafast -threads 0 -pix_fmt yuv420p -r 30 -vsync cfr "${videoTempPath}"`;
-            await execFFmpeg(processVideoCommand, `Procesar video ${i + 1} con logo y texto`, 300000); // 5 minutos
+            await execFFmpeg(processVideoCommand, `Procesar video ${i + 1} con logo y texto`, 600000); // 10 minutos
           } else {
             // Sin logo, solo aplicamos texto si es necesario
             if (textOverlay) {
               const drawTextFilter = textOverlay.replace(/^,/, '');
               const processVideoCommand = `ffmpeg -y -i "${currentVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1:1,${drawTextFilter}" -c:v libx264 -preset ultrafast -threads 0 -pix_fmt yuv420p -r 30 -vsync cfr "${videoTempPath}"`;
-              await execFFmpeg(processVideoCommand, `Procesar video ${i + 1} con texto`, 300000); // 5 minutos
+              await execFFmpeg(processVideoCommand, `Procesar video ${i + 1} con texto`, 600000); // 10 minutos
             } else {
               const processVideoCommand = `ffmpeg -y -i "${currentVideo.filepath}" -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1:1" -c:v libx264 -preset ultrafast -threads 0 -pix_fmt yuv420p -r 30 -vsync cfr "${videoTempPath}"`;
-              await execFFmpeg(processVideoCommand, `Escalar video ${i + 1}`, 300000); // 5 minutos
+              await execFFmpeg(processVideoCommand, `Escalar video ${i + 1}`, 600000); // 10 minutos
             }
           }
 
@@ -1637,7 +1622,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Concatenar videos - en lugar de usar copy, recodificamos para asegurar compatibilidad
           const concatOutputPath = path.join(tempDir, `concat_output_${nanoid()}.mp4`);
           const concatCommand = `ffmpeg -y -f concat -safe 0 -i "${concatFilePath}" -c:v libx264 -preset ultrafast -pix_fmt yuv420p -r 30 -vsync 1 -strict -2 "${concatOutputPath}"`;
-          await execFFmpeg(concatCommand, "Concatenar múltiples videos", 300000); // 5 minutos
+          await execFFmpeg(concatCommand, "Concatenar múltiples videos", 600000); // 10 minutos
 
           // Ahora combinar el video concatenado con el audio
           if (backgroundMusic && backgroundMusic.filepath && fs.existsSync(backgroundMusic.filepath)) {
@@ -1691,12 +1676,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             fs.unlinkSync(video);
           }
         }
-        
-        // Limpiar archivo de texto temporal si existe
-        if (textfilePath && fs.existsSync(textfilePath)) {
-          fs.unlinkSync(textfilePath);
-        }
-        
+
+
         // Limpiar logo temporal si existe
         if (hasLogo && fs.existsSync(logoTempPath)) {
           fs.unlinkSync(logoTempPath);
@@ -1720,16 +1701,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parsedData = insertVideoSchema.parse(videoData);
       const video = await storage.createVideo(parsedData);
 
+      const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
+      logger.success('VIDEO', `✅ Video generado exitosamente en ${totalTime}s`, {
+        videoId: video.id,
+        filename: outputFilename,
+        duration: totalTime + 's'
+      });
+
       res.status(201).json(video);
     } catch (error) {
-      console.error("Video generation error:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('VIDEO', 'Error en generación de video', { error: errorMessage });
 
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
         res.status(400).json({ error: validationError.message });
       } else {
         // Mostrar error detallado para ayudar en la depuración
-        const errorMessage = error instanceof Error ? error.message : String(error);
         console.error("Error detallado:", errorMessage);
         res.status(500).json({ error: `Error al generar video: ${errorMessage}` });
       }
@@ -2611,6 +2599,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete music" });
+    }
+  });
+
+  // ============================================
+  // API DE LOGS - Sistema de logging robusto
+  // ============================================
+
+  // Obtener logs con filtros
+  app.get("/api/logs", (req, res) => {
+    try {
+      const { level, category, search, limit, offset, startDate, endDate } = req.query;
+
+      const result = logger.getLogs({
+        level: level as any,
+        category: category as string,
+        search: search as string,
+        limit: limit ? parseInt(limit as string) : 100,
+        offset: offset ? parseInt(offset as string) : 0,
+        startDate: startDate as string,
+        endDate: endDate as string,
+      });
+
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Error fetching logs" });
+    }
+  });
+
+  // Obtener estadísticas de logs
+  app.get("/api/logs/stats", (req, res) => {
+    try {
+      const stats = logger.getStats();
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ error: "Error fetching log stats" });
+    }
+  });
+
+  // Obtener categorías de logs
+  app.get("/api/logs/categories", (req, res) => {
+    try {
+      const categories = logger.getCategories();
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ error: "Error fetching categories" });
+    }
+  });
+
+  // Limpiar logs antiguos
+  app.delete("/api/logs/old", (req, res) => {
+    try {
+      const days = req.query.days ? parseInt(req.query.days as string) : 7;
+      const result = logger.clearOldLogs(days);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Error clearing old logs" });
     }
   });
 

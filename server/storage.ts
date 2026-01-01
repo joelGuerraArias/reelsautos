@@ -47,6 +47,7 @@ export interface IStorage {
   getVideo(id: number): Promise<Video | undefined>;
   getVideoByProjectId(projectId: string): Promise<Video | undefined>;
   getVideosByProjectId(projectId: string): Promise<Video[]>;
+  getAllVideos(): Promise<Video[]>;
 
   // Legacy User Preferences methods
   getFavoriteVoice(): Promise<UserPreferences | undefined>;
@@ -258,6 +259,13 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(videos)
       .where(eq(videos.projectId, projectId))
+      .orderBy(desc(videos.createdAt));
+  }
+
+  async getAllVideos(): Promise<Video[]> {
+    return await db
+      .select()
+      .from(videos)
       .orderBy(desc(videos.createdAt));
   }
 
@@ -594,6 +602,10 @@ class MemStorage implements IStorage {
     return Array.from(this.videos.values()).filter(v => v.projectId === projectId);
   }
 
+  async getAllVideos(): Promise<Video[]> {
+    return Array.from(this.videos.values());
+  }
+
   // Stubs para otros métodos requeridos por la interfaz
   async getFavoriteVoice(): Promise<UserPreferences | undefined> { return this.userPreferences; }
   async saveFavoriteVoice(preferences: InsertUserPreferences): Promise<UserPreferences> {
@@ -869,6 +881,10 @@ class PersistentStorage implements IStorage {
 
   async getVideosByProjectId(projectId: string): Promise<Video[]> {
     return Object.values(this.data.videos).filter((v: any) => v.projectId === projectId);
+  }
+
+  async getAllVideos(): Promise<Video[]> {
+    return Object.values(this.data.videos);
   }
 
   // Uploaded Video methods
